@@ -38,11 +38,15 @@ const DEFAULT_DELEGATION_PROGRAM = new PublicKey(
   'DELeGGvXpWV2fqJUhqcF5ZSYMS4JTLjteaAMARRSaeSh'
 );
 
+// wSOL mint address - always included by default
+export const WSOL_MINT = new PublicKey('So11111111111111111111111111111111111111112');
+
 export class L2ConceptSdk {
   program: Program<L2conceptv1>;
   provider: AnchorProvider;
   pda: PdaHelper;
   config: SdkConfig;
+  wsolMint: PublicKey = WSOL_MINT;
 
   constructor(config: SdkConfig) {
     this.config = config;
@@ -68,6 +72,7 @@ export class L2ConceptSdk {
       instructions: [
         { name: 'initialize', accounts: [], args: [] },
         { name: 'join', accounts: [], args: [] },
+        { name: 'completeSetup', accounts: [], args: [] },
         { name: 'addMint', accounts: [], args: [] },
         { name: 'deposit', accounts: [], args: [] },
         { name: 'transferBatch', accounts: [], args: [] },
@@ -140,6 +145,30 @@ export class L2ConceptSdk {
       .accounts({
         owner,
         userState,
+        systemProgram: SystemProgram.programId,
+      })
+      .transaction();
+
+    return this.sendTransaction(tx);
+  }
+
+  /**
+   * Complete setup - creates UserState and wSOL UserBalance (wSOL always included by default)
+   * Additional mints should be added via addMint() calls after this
+   */
+  async completeSetup(): Promise<TransactionResult> {
+    if (!this.isConnected) throw new Error('Wallet not connected');
+
+    const owner = this.walletPublicKey!;
+    const [userState] = this.pda.deriveUserState(owner);
+    const [wsolBalance] = this.pda.deriveUserBalance(owner, this.wsolMint);
+
+    const tx = await this.program.methods
+      .completeSetup()
+      .accounts({
+        owner,
+        userState,
+        wsolBalance,
         systemProgram: SystemProgram.programId,
       })
       .transaction();

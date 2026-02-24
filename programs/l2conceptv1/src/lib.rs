@@ -18,6 +18,9 @@ declare_id!("L2CnccKT1qHNS1wJ7p3wJ3JhCX5s4J5wT5x3h5mH2j1");
 pub const DEFAULT_DELEGATION_PROGRAM_ID: Pubkey =
     pubkey!("DELeGGvXpWV2fqJUhqcF5ZSYMS4JTLjteaAMARRSaeSh");
 
+// wSOL mint address - always included by default
+pub const WSOL_MINT: Pubkey = pubkey!("So11111111111111111111111111111111111111112");
+
 #[program]
 pub mod l2conceptv1 {
     use super::*;
@@ -53,6 +56,33 @@ pub mod l2conceptv1 {
 
         emit!(JoinEvent {
             owner: user_state.owner,
+        });
+
+        Ok(())
+    }
+
+    /// Complete setup by creating UserState and wSOL UserBalance (always included by default)
+    /// Additional mints should be added via separate add_mint calls
+    pub fn complete_setup(ctx: Context<CompleteSetup>) -> Result<()> {
+        // 1. Create UserState
+        let user_state = &mut ctx.accounts.user_state;
+        user_state.owner = ctx.accounts.owner.key();
+        user_state.bump = ctx.bumps.user_state;
+        user_state.state_version = 0;
+
+        // 2. Create wSOL UserBalance (always included by default)
+        let wsol_balance = &mut ctx.accounts.wsol_balance;
+        wsol_balance.owner = ctx.accounts.owner.key();
+        wsol_balance.mint = WSOL_MINT;
+        wsol_balance.bump = ctx.bumps.wsol_balance;
+        wsol_balance.amount = 0;
+        wsol_balance.version = 0;
+
+        emit!(CompleteSetupEvent {
+            owner: ctx.accounts.owner.key(),
+            wsol_included: true,
+            additional_mints_count: 0,
+            total_balances: 1,
         });
 
         Ok(())
@@ -421,6 +451,36 @@ pub struct Join<'info> {
 }
 
 #[derive(Accounts)]
+pub struct CompleteSetup<'info> {
+    #[account(mut)]
+    pub owner: Signer<'info>,
+
+    #[account(
+        init,
+        payer = owner,
+        space = 8 + UserState::SIZE,
+        seeds = [USER_STATE_SEED.as_bytes(), owner.key().as_ref()],
+        bump
+    )]
+    pub user_state: Account<'info, UserState>,
+
+    #[account(
+        init,
+        payer = owner,
+        space = 8 + UserBalance::SIZE,
+        seeds = [
+            USER_BALANCE_SEED.as_bytes(),
+            owner.key().as_ref(),
+            WSOL_MINT.as_ref()
+        ],
+        bump
+    )]
+    pub wsol_balance: Account<'info, UserBalance>,
+
+    pub system_program: Program<'info, System>,
+}
+
+#[derive(Accounts)]
 #[instruction()]
 pub struct AddMint<'info> {
     #[account(mut)]
@@ -635,3 +695,4 @@ pub const USER_BALANCE_SEED: &str = "user_balance";
 pub const VAULT_AUTHORITY_SEED: &str = "vault_authority";
 pub const MAX_BATCH_TRANSFER_RECIPIENTS: usize = 15;
 pub const MAX_MINTS_PER_DELEGATION: usize = 10;
+pub const MAX_MINTS_PER_SETUP: usize = 9; // wSOL + 9 additional = 10 total

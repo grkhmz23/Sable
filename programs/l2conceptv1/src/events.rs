@@ -12,6 +12,14 @@ pub struct JoinEvent {
 }
 
 #[event]
+pub struct CompleteSetupEvent {
+    pub owner: Pubkey,
+    pub wsol_included: bool,
+    pub additional_mints_count: u8,
+    pub total_balances: u8,
+}
+
+#[event]
 pub struct AddMintEvent {
     pub owner: Pubkey,
     pub mint: Pubkey,

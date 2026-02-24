@@ -52,4 +52,10 @@ pub enum L2ConceptV1Error {
 
     #[msg("Account is not delegated")]
     NotDelegated,
+
+    #[msg("Too many mints in setup")]
+    TooManyMints,
+
+    #[msg("Duplicate mint in setup")]
+    DuplicateMint,
 }

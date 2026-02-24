@@ -3,25 +3,46 @@
 import { useState, useEffect, useCallback } from 'react';
 import { useWalletContext } from '@/contexts/WalletContext';
 import { useWallet } from '@solana/wallet-adapter-react';
+import { PublicKey } from '@solana/web3.js';
+import { WSOL_MINT } from '@l2conceptv1/sdk';
 import toast from 'react-hot-toast';
 
 export function UserStatus() {
   const { sdk } = useWalletContext();
   const { publicKey } = useWallet();
   const [hasJoined, setHasJoined] = useState<boolean | null>(null);
+  const [hasWsolBalance, setHasWsolBalance] = useState<boolean | null>(null);
   const [userState, setUserState] = useState<any>(null);
   const [isLoading, setIsLoading] = useState(false);
+  const [setupStep, setSetupStep] = useState<'not_joined' | 'joined_no_wsol' | 'completed'>('not_joined');
 
   const checkStatus = useCallback(async () => {
     if (!sdk || !publicKey) return;
-    
+
     try {
       const state = await sdk.getUserState(publicKey);
       setHasJoined(!!state);
       setUserState(state);
+
+      if (state) {
+        // Check if wSOL balance exists
+        const wsolBalance = await sdk.getUserBalance(publicKey, WSOL_MINT);
+        setHasWsolBalance(!!wsolBalance);
+
+        if (wsolBalance) {
+          setSetupStep('completed');
+        } else {
+          setSetupStep('joined_no_wsol');
+        }
+      } else {
+        setSetupStep('not_joined');
+        setHasWsolBalance(false);
+      }
     } catch (error) {
       console.error('Error checking user status:', error);
       setHasJoined(false);
+      setHasWsolBalance(false);
+      setSetupStep('not_joined');
     }
   }, [sdk, publicKey]);
 
@@ -32,7 +53,7 @@ export function UserStatus() {
   const handleJoin = async () => {
     if (!sdk) return;
     setIsLoading(true);
-    
+
     try {
       const result = await sdk.join();
       toast.success('Successfully joined!');
@@ -46,18 +67,36 @@ export function UserStatus() {
     }
   };
 
+  const handleCompleteSetup = async () => {
+    if (!sdk) return;
+    setIsLoading(true);
+
+    try {
+      const result = await sdk.completeSetup();
+      toast.success('Setup complete! wSOL balance created.');
+      console.log('Complete setup transaction:', result.signature);
+      await checkStatus();
+    } catch (error: any) {
+      console.error('Complete setup error:', error);
+      toast.error(error.message || 'Failed to complete setup');
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
   return (
     <div className="p-6 bg-white rounded-lg shadow-md">
       <h2 className="text-xl font-semibold mb-4">User Status</h2>
 
       {hasJoined === null ? (
         <p className="text-gray-500">Checking status...</p>
-      ) : hasJoined ? (
+      ) : setupStep === 'completed' ? (
         <div className="space-y-2">
           <div className="flex items-center gap-2">
             <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-green-100 text-green-800">
-              Joined
+              Setup Complete
             </span>
+            <span className="text-xs text-gray-500">(wSOL included)</span>
           </div>
           {userState && (
             <div className="text-sm text-gray-600">
@@ -66,18 +105,48 @@ export function UserStatus() {
             </div>
           )}
         </div>
-      ) : (
+      ) : setupStep === 'joined_no_wsol' ? (
         <div className="space-y-4">
+          <div className="flex items-center gap-2">
+            <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-yellow-100 text-yellow-800">
+              Partially Setup
+            </span>
+          </div>
           <p className="text-gray-600">
-            You haven&apos;t joined yet. Join to start using the vault.
+            You&apos;ve joined but need to complete setup to create your wSOL balance.
           </p>
           <button
-            onClick={handleJoin}
+            onClick={handleCompleteSetup}
             disabled={isLoading}
             className="px-4 py-2 bg-primary-600 text-white rounded-md hover:bg-primary-700 disabled:opacity-50 disabled:cursor-not-allowed"
           >
-            {isLoading ? 'Joining...' : 'Join'}
+            {isLoading ? 'Completing Setup...' : 'Complete Setup (includes wSOL)'}
           </button>
+        </div>
+      ) : (
+        <div className="space-y-4">
+          <p className="text-gray-600">
+            You haven&apos;t joined yet. Complete setup to create your account with wSOL support.
+          </p>
+          <div className="flex gap-2">
+            <button
+              onClick={handleJoin}
+              disabled={isLoading}
+              className="px-4 py-2 bg-gray-600 text-white rounded-md hover:bg-gray-700 disabled:opacity-50 disabled:cursor-not-allowed"
+            >
+              {isLoading ? 'Joining...' : 'Join Only'}
+            </button>
+            <button
+              onClick={handleCompleteSetup}
+              disabled={isLoading}
+              className="px-4 py-2 bg-primary-600 text-white rounded-md hover:bg-primary-700 disabled:opacity-50 disabled:cursor-not-allowed"
+            >
+              {isLoading ? 'Setting up...' : 'Complete Setup (includes wSOL)'}
+            </button>
+          </div>
+          <p className="text-xs text-gray-500">
+            Tip: &quot;Complete Setup&quot; creates your account with wSOL balance in one step.
+          </p>
         </div>
       )}
     </div>

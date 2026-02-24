@@ -4,12 +4,14 @@ import { useState, useEffect, useCallback } from 'react';
 import { useWalletContext } from '@/contexts/WalletContext';
 import { useWallet } from '@solana/wallet-adapter-react';
 import { PublicKey } from '@solana/web3.js';
+import { WSOL_MINT } from '@l2conceptv1/sdk';
 import toast from 'react-hot-toast';
 
 interface BalanceInfo {
   mint: PublicKey;
   amount: string;
   version: string;
+  isWsol: boolean;
 }
 
 export function BalanceList() {
@@ -28,7 +30,16 @@ export function BalanceList() {
         mint: b.account.mint,
         amount: b.account.amount.toString(),
         version: b.account.version.toString(),
+        isWsol: b.account.mint.toBase58() === WSOL_MINT.toBase58(),
       }));
+      
+      // Sort: wSOL first, then others
+      formatted.sort((a: BalanceInfo, b: BalanceInfo) => {
+        if (a.isWsol && !b.isWsol) return -1;
+        if (!a.isWsol && b.isWsol) return 1;
+        return 0;
+      });
+      
       setBalances(formatted);
     } catch (error) {
       console.error('Error fetching balances:', error);
@@ -85,7 +96,18 @@ export function BalanceList() {
       </div>
 
       {balances.length === 0 ? (
-        <p className="text-gray-500">No balances yet. Add a mint to get started.</p>
+        <div className="space-y-2">
+          <p className="text-gray-500">No balances yet.</p>
+          <p className="text-sm text-yellow-600">
+            ⚠️ wSOL balance not found. Complete setup to enable wSOL support.
+          </p>
+        </div>
+      ) : !balances.some(b => b.isWsol) ? (
+        <div className="mb-4 p-3 bg-yellow-50 border border-yellow-200 rounded-md">
+          <p className="text-sm text-yellow-800">
+            ⚠️ wSOL not set up. Complete setup to add wSOL balance.
+          </p>
+        </div>
       ) : (
         <div className="overflow-x-auto">
           <table className="w-full">
@@ -99,9 +121,18 @@ export function BalanceList() {
             <tbody>
               {balances.map((balance, idx) => (
                 <tr key={idx} className="border-b last:border-b-0">
-                  <td className="py-2 px-4 font-mono text-sm">
-                    {balance.mint.toBase58().slice(0, 8)}...
-                    {balance.mint.toBase58().slice(-8)}
+                  <td className="py-2 px-4">
+                    <div className="flex items-center gap-2">
+                      <span className="font-mono text-sm">
+                        {balance.mint.toBase58().slice(0, 8)}...
+                        {balance.mint.toBase58().slice(-8)}
+                      </span>
+                      {balance.isWsol && (
+                        <span className="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-blue-100 text-blue-800">
+                          wSOL
+                        </span>
+                      )}
+                    </div>
                   </td>
                   <td className="py-2 px-4 text-right">
                     {formatAmount(balance.amount)}
