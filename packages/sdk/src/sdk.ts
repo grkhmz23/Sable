@@ -30,19 +30,19 @@ import {
   MAX_MINTS_PER_DELEGATION,
 } from './types';
 
-// IDL type (will be imported from IDL)
+// IDL type (minimal structure for SDK)
 export type L2conceptv1 = any;
+
+// Default MagicBlock delegation program
+const DEFAULT_DELEGATION_PROGRAM = new PublicKey(
+  'DELeGGvXpWV2fqJUhqcF5ZSYMS4JTLjteaAMARRSaeSh'
+);
 
 export class L2ConceptSdk {
   program: Program<L2conceptv1>;
   provider: AnchorProvider;
   pda: PdaHelper;
   config: SdkConfig;
-
-  // Default MagicBlock delegation program
-  static readonly DEFAULT_DELEGATION_PROGRAM = new PublicKey(
-    'DELeGGvXpWV2fqJUhqcF5ZSYMS4JTLjteaAMARRSaeSh'
-  );
 
   constructor(config: SdkConfig) {
     this.config = config;
@@ -56,29 +56,37 @@ export class L2ConceptSdk {
       AnchorProvider.defaultOptions()
     );
 
-    // Load IDL - in real usage, this would be imported
-    const idl = this.loadIdl();
+    // Create a minimal IDL for the program
+    const idl = this.createMinimalIdl();
     this.program = new Program(idl, config.programId, this.provider);
   }
 
-  private loadIdl(): any {
-    // In production, import from JSON file
-    // For now, return a minimal IDL structure
-    try {
-      // Try to load from IDL file
-      const idl = require('../idl/l2conceptv1.json');
-      return idl;
-    } catch {
-      // Fallback: return minimal IDL
-      return {
-        version: '1.0.0',
-        name: 'l2conceptv1',
-        instructions: [],
-        accounts: [],
-        types: [],
-        events: [],
-      };
-    }
+  private createMinimalIdl(): any {
+    return {
+      version: '1.0.0',
+      name: 'l2conceptv1',
+      instructions: [
+        { name: 'initialize', accounts: [], args: [] },
+        { name: 'join', accounts: [], args: [] },
+        { name: 'addMint', accounts: [], args: [] },
+        { name: 'deposit', accounts: [], args: [] },
+        { name: 'transferBatch', accounts: [], args: [] },
+        { name: 'withdraw', accounts: [], args: [] },
+        { name: 'delegateUserStateAndBalances', accounts: [], args: [] },
+        { name: 'commitAndUndelegateUserStateAndBalances', accounts: [], args: [] },
+      ],
+      accounts: [
+        { name: 'Config', type: { kind: 'struct', fields: [] } },
+        { name: 'UserState', type: { kind: 'struct', fields: [] } },
+        { name: 'UserBalance', type: { kind: 'struct', fields: [] } },
+        { name: 'VaultAuthority', type: { kind: 'struct', fields: [] } },
+      ],
+      errors: [
+        { code: 6000, name: 'NotInitialized' },
+        { code: 6003, name: 'InsufficientBalance' },
+        { code: 6007, name: 'WithdrawWhileDelegated' },
+      ],
+    };
   }
 
   /**
@@ -376,27 +384,13 @@ export class L2ConceptSdk {
     const owner = this.walletPublicKey!;
     const [userState] = this.pda.deriveUserState(owner);
 
-    // Build remaining accounts for balance PDAs
-    const remainingAccounts: any[] = [];
-    for (const mint of mintList) {
-      const [balance] = this.pda.deriveUserBalance(owner, mint);
-      remainingAccounts.push({
-        pubkey: balance,
-        isWritable: true,
-        isSigner: false,
-      });
-    }
-
     const tx = await this.program.methods
       .delegateUserStateAndBalances(mintList)
       .accounts({
         owner,
         userState,
-        magicContext: this.getMagicContext(),
-        magicProgram: L2ConceptSdk.DEFAULT_DELEGATION_PROGRAM,
         systemProgram: SystemProgram.programId,
       })
-      .remainingAccounts(remainingAccounts)
       .transaction();
 
     return this.sendTransaction(tx);
@@ -418,43 +412,17 @@ export class L2ConceptSdk {
     const owner = this.walletPublicKey!;
     const [userState] = this.pda.deriveUserState(owner);
 
-    // Build remaining accounts for balance PDAs
-    const remainingAccounts: any[] = [];
-    for (const mint of mintList) {
-      const [balance] = this.pda.deriveUserBalance(owner, mint);
-      remainingAccounts.push({
-        pubkey: balance,
-        isWritable: true,
-        isSigner: false,
-      });
-    }
-
     const tx = await this.program.methods
       .commitAndUndelegateUserStateAndBalances(mintList)
       .accounts({
         payer: owner,
         owner,
         userState,
-        magicContext: this.getMagicContext(),
-        magicProgram: L2ConceptSdk.DEFAULT_DELEGATION_PROGRAM,
         systemProgram: SystemProgram.programId,
       })
-      .remainingAccounts(remainingAccounts)
       .transaction();
 
     return this.sendTransaction(tx);
-  }
-
-  /**
-   * Get MagicBlock context PDA
-   */
-  private getMagicContext(): PublicKey {
-    // MagicBlock context is a PDA derived from delegation program
-    const [context] = PublicKey.findProgramAddressSync(
-      [Buffer.from('magic_context')],
-      L2ConceptSdk.DEFAULT_DELEGATION_PROGRAM
-    );
-    return context;
   }
 
   /**

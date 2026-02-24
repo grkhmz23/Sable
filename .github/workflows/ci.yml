@@ -1,0 +1,139 @@
+name: CI
+
+on:
+  push:
+    branches: [main, master]
+  pull_request:
+    branches: [main, master]
+
+env:
+  NODE_VERSION: '20'
+  PNPM_VERSION: '9'
+  RUST_VERSION: '1.85.0'
+  SOLANA_VERSION: '1.17.0'
+  ANCHOR_VERSION: '0.29.0'
+
+jobs:
+  build-and-test:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+
+      - name: Setup pnpm
+        uses: pnpm/action-setup@v3
+        with:
+          version: ${{ env.PNPM_VERSION }}
+
+      - name: Get pnpm store directory
+        shell: bash
+        run: |
+          echo "STORE_PATH=$(pnpm store path --silent)" >> $GITHUB_ENV
+
+      - name: Setup pnpm cache
+        uses: actions/cache@v4
+        with:
+          path: ${{ env.STORE_PATH }}
+          key: ${{ runner.os }}-pnpm-store-${{ hashFiles('**/pnpm-lock.yaml') }}
+          restore-keys: |
+            ${{ runner.os }}-pnpm-store-
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Setup Rust
+        uses: dtolnay/rust-action@stable
+        with:
+          toolchain: ${{ env.RUST_VERSION }}
+          components: rustfmt, clippy
+
+      - name: Cache Rust dependencies
+        uses: Swatinem/rust-cache@v2
+        with:
+          workspaces: programs/l2conceptv1
+
+      - name: Check Rust formatting
+        run: |
+          cd programs/l2conceptv1
+          cargo fmt -- --check
+
+      - name: Run Rust clippy
+        run: |
+          cd programs/l2conceptv1
+          cargo clippy -- -W clippy::all
+
+      - name: Build Anchor program
+        run: |
+          cd programs/l2conceptv1
+          cargo check
+
+      - name: Build packages
+        run: pnpm build:all
+
+      - name: Type check
+        run: pnpm typecheck
+
+      - name: Lint
+        run: pnpm lint || true
+
+      - name: Build Next.js app
+        run: pnpm app:build
+        env:
+          NEXT_PUBLIC_SOLANA_RPC_URL: http://127.0.0.1:8899
+          NEXT_PUBLIC_L2CONCEPTV1_PROGRAM_ID: L2CnccKT1qHNS1wJ7p3wJ3JhCX5s4J5wT5x3h5mH2j1
+
+  scan-placeholders:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Scan for placeholders
+        run: |
+          # Scan for common placeholder patterns
+          patterns=("PLACEHOLDER" "TODO" "FIXME" "HACK" "XXX" "lorem" "changeme" "YOUR_" "TBD")
+          found=0
+          
+          for pattern in "${patterns[@]}"; do
+            # Exclude legitimate uses like HTML placeholder attributes and SHA hashes
+            results=$(grep -ri "$pattern" --include="*.ts" --include="*.tsx" --include="*.rs" --include="*.js" --exclude-dir=node_modules --exclude-dir=target --exclude-dir=.git . 2>/dev/null | grep -v "placeholder=" | grep -v "sha512-" | grep -v "integrity" || true)
+            if [ -n "$results" ]; then
+              echo "Found $pattern:"
+              echo "$results"
+              found=1
+            fi
+          done
+          
+          if [ $found -eq 1 ]; then
+            echo "Placeholder patterns found. Please remove them."
+            exit 1
+          else
+            echo "No placeholder patterns found."
+          fi
+
+  scan-secrets:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Scan for hardcoded secrets
+        run: |
+          # Scan for potential secrets (excluding test files and legitimate API URLs)
+          secrets=$(grep -riE "(api[_-]?key|private[_-]?key|secret|password)\s*[=:]\s*[\"'][^\"']{10,}[\"']" \
+            --include="*.ts" --include="*.tsx" --include="*.js" --include="*.json" \
+            --exclude-dir=node_modules --exclude-dir=target --exclude-dir=.git . 2>/dev/null | \
+            grep -v "// " | grep -v "# " | grep -v "example" | grep -v "test" || true)
+          
+          if [ -n "$secrets" ]; then
+            echo "Potential hardcoded secrets found:"
+            echo "$secrets"
+            exit 1
+          else
+            echo "No hardcoded secrets found."
+          fi

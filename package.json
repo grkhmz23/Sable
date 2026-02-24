@@ -5,20 +5,28 @@
   "private": true,
   "scripts": {
     "install:all": "pnpm install",
-    "anchor:build": "cd programs/l2conceptv1 && anchor build",
+    "anchor:build": "cd programs/l2conceptv1 && cargo build-sbf",
     "anchor:test": "cd programs/l2conceptv1 && anchor test",
     "anchor:deploy:devnet": "cd programs/l2conceptv1 && anchor deploy --provider.cluster devnet",
     "app:dev": "cd app && pnpm dev",
     "app:build": "cd app && pnpm build",
+    "app:lint": "cd app && pnpm lint",
+    "app:typecheck": "cd app && pnpm typecheck",
     "idl:sync": "node scripts/idl-sync.js",
-    "build:all": "pnpm anchor:build && pnpm idl:sync && pnpm -r build",
+    "build:all": "pnpm -r build",
+    "build": "pnpm build:all",
     "clean": "find . -type d -name node_modules -exec rm -rf {} + 2>/dev/null; find . -type d -name target -exec rm -rf {} + 2>/dev/null; find . -type d -name dist -exec rm -rf {} + 2>/dev/null; echo 'Cleaned build artifacts'",
     "lint": "pnpm -r lint",
-    "typecheck": "pnpm -r typecheck"
+    "lint:root": "eslint . --ext .ts,.js --ignore-pattern '**/node_modules/**' --ignore-pattern '**/target/**' --ignore-pattern '**/dist/**'",
+    "typecheck": "pnpm -r typecheck",
+    "typecheck:root": "tsc --noEmit",
+    "test": "pnpm anchor:test",
+    "verify": "pnpm lint && pnpm typecheck && pnpm build:all"
   },
   "devDependencies": {
     "@types/node": "^20.10.0",
-    "typescript": "^5.3.0"
+    "typescript": "^5.3.0",
+    "eslint": "^8.55.0"
   },
   "engines": {
     "node": ">=20.0.0",

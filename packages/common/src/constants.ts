@@ -1,12 +1,5 @@
 import { PublicKey } from '@solana/web3.js';
 
-// Program IDs
-export const L2CONCEPTV1_PROGRAM_ID = new PublicKey(
-  process.env.REACT_APP_L2CONCEPTV1_PROGRAM_ID || 
-  process.env.NEXT_PUBLIC_L2CONCEPTV1_PROGRAM_ID ||
-  'L2CnccKT1qHNS1wJ7p3wJ3JhCX5s4J5wT5x3h5mH2j1'
-);
-
 // MagicBlock Delegation Program ID (mainnet)
 export const MAGICBLOCK_DELEGATION_PROGRAM_ID = new PublicKey(
   'DELeGGvXpWV2fqJUhqcF5ZSYMS4JTLjteaAMARRSaeSh'
@@ -43,3 +36,18 @@ export const RPC_ENDPOINTS = {
   DEVNET: 'https://api.devnet.solana.com',
   MAINNET: 'https://api.mainnet-beta.solana.com',
 } as const;
+
+/**
+ * Get the program ID from environment or use default
+ * Priority: process.env -> default devnet/localnet value
+ */
+export function getProgramId(): PublicKey {
+  const envProgramId = 
+    typeof process !== 'undefined' ? 
+    (process.env.REACT_APP_L2CONCEPTV1_PROGRAM_ID || 
+     process.env.NEXT_PUBLIC_L2CONCEPTV1_PROGRAM_ID) : 
+    undefined;
+  
+  const programIdStr = envProgramId || 'L2CnccKT1qHNS1wJ7p3wJ3JhCX5s4J5wT5x3h5mH2j1';
+  return new PublicKey(programIdStr);
+}

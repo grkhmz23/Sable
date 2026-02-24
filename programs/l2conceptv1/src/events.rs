@@ -1,5 +1,4 @@
 use anchor_lang::prelude::*;
-use crate::state::TransferItem;
 
 #[event]
 pub struct InitializeEvent {

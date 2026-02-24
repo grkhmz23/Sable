@@ -1,6 +1,6 @@
 'use client';
 
-import { FC, ReactNode, useMemo, useCallback, useState, useEffect } from 'react';
+import { FC, ReactNode, useMemo, useCallback, useState, useEffect, createContext, useContext } from 'react';
 import {
   ConnectionProvider,
   WalletProvider,
@@ -18,20 +18,10 @@ import {
 } from '@solana/wallet-adapter-react-ui';
 import { Connection, PublicKey } from '@solana/web3.js';
 import { L2ConceptSdk } from '@l2conceptv1/sdk';
+import { env } from '@/utils/env';
 
 // Import wallet adapter CSS
 import '@solana/wallet-adapter-react-ui/styles.css';
-
-// Environment configuration
-const SOLANA_RPC_URL =
-  process.env.NEXT_PUBLIC_SOLANA_RPC_URL || 'http://127.0.0.1:8899';
-const MAGICBLOCK_RPC_URL =
-  process.env.NEXT_PUBLIC_MAGICBLOCK_RPC_URL || SOLANA_RPC_URL;
-const MAGIC_ROUTER_URL = process.env.NEXT_PUBLIC_MAGIC_ROUTER_URL;
-
-const PROGRAM_ID =
-  process.env.NEXT_PUBLIC_L2CONCEPTV1_PROGRAM_ID ||
-  'L2CnccKT1qHNS1wJ7p3wJ3JhCX5s4J5wT5x3h5mH2j1';
 
 export type RoutingMode = 'router' | 'solana' | 'er';
 
@@ -43,8 +33,6 @@ interface WalletContextValue {
   isLoading: boolean;
   refreshUserState: () => Promise<void>;
 }
-
-import { createContext, useContext } from 'react';
 
 const WalletContext = createContext<WalletContextValue | null>(null);
 
@@ -67,7 +55,11 @@ const WalletContextInner: FC<{ children: ReactNode }> = ({ children }) => {
   const connection = useMemo(() => {
     switch (routingMode) {
       case 'er':
-        return new Connection(MAGICBLOCK_RPC_URL, 'confirmed');
+        if (!env.MAGICBLOCK_RPC_URL) {
+          console.warn('MagicBlock RPC URL not set, falling back to Solana RPC');
+          return baseConnection;
+        }
+        return new Connection(env.MAGICBLOCK_RPC_URL, 'confirmed');
       case 'router':
         // Router mode would use a custom fetch implementation
         return baseConnection;
@@ -82,7 +74,7 @@ const WalletContextInner: FC<{ children: ReactNode }> = ({ children }) => {
     if (!wallet.publicKey || !wallet.signTransaction) return null;
 
     return new L2ConceptSdk({
-      programId: new PublicKey(PROGRAM_ID),
+      programId: new PublicKey(env.L2CONCEPTV1_PROGRAM_ID),
       connection,
       wallet: {
         publicKey: wallet.publicKey,
@@ -127,7 +119,7 @@ export const WalletContextProvider: FC<{ children: ReactNode }> = ({
     [network]
   );
 
-  const endpoint = useMemo(() => SOLANA_RPC_URL, []);
+  const endpoint = useMemo(() => env.SOLANA_RPC_URL, []);
 
   return (
     <ConnectionProvider endpoint={endpoint}>
