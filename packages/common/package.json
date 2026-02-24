@@ -1,0 +1,20 @@
+{
+  "name": "@l2conceptv1/common",
+  "version": "1.0.0",
+  "description": "Shared constants and types for L2conceptv1",
+  "main": "dist/index.js",
+  "types": "dist/index.d.ts",
+  "scripts": {
+    "build": "tsc",
+    "lint": "eslint .",
+    "typecheck": "tsc --noEmit"
+  },
+  "dependencies": {
+    "@solana/web3.js": "^1.87.0",
+    "bn.js": "^5.2.1"
+  },
+  "devDependencies": {
+    "@types/bn.js": "^5.1.5",
+    "typescript": "^5.3.0"
+  }
+}

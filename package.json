@@ -1,0 +1,28 @@
+{
+  "name": "l2conceptv1",
+  "version": "1.0.0",
+  "description": "L2 Concept V1 - Vault + Ledger PDAs with MagicBlock Ephemeral Rollup",
+  "private": true,
+  "scripts": {
+    "install:all": "pnpm install",
+    "anchor:build": "cd programs/l2conceptv1 && anchor build",
+    "anchor:test": "cd programs/l2conceptv1 && anchor test",
+    "anchor:deploy:devnet": "cd programs/l2conceptv1 && anchor deploy --provider.cluster devnet",
+    "app:dev": "cd app && pnpm dev",
+    "app:build": "cd app && pnpm build",
+    "idl:sync": "node scripts/idl-sync.js",
+    "build:all": "pnpm anchor:build && pnpm idl:sync && pnpm -r build",
+    "clean": "find . -type d -name node_modules -exec rm -rf {} + 2>/dev/null; find . -type d -name target -exec rm -rf {} + 2>/dev/null; find . -type d -name dist -exec rm -rf {} + 2>/dev/null; echo 'Cleaned build artifacts'",
+    "lint": "pnpm -r lint",
+    "typecheck": "pnpm -r typecheck"
+  },
+  "devDependencies": {
+    "@types/node": "^20.10.0",
+    "typescript": "^5.3.0"
+  },
+  "engines": {
+    "node": ">=20.0.0",
+    "pnpm": ">=8.0.0"
+  },
+  "packageManager": "pnpm@9.0.0"
+}

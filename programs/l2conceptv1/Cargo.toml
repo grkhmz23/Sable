@@ -1,0 +1,27 @@
+[package]
+name = "l2conceptv1"
+version = "1.0.0"
+description = "L2 Concept V1 - Vault + Ledger PDAs with MagicBlock Ephemeral Rollup"
+edition = "2021"
+
+[lib]
+crate-type = ["cdylib", "lib"]
+name = "l2conceptv1"
+
+[features]
+default = []
+no-entrypoint = []
+no-idl = []
+no-log-ix-name = []
+cpi = ["no-entrypoint"]
+
+[dependencies]
+anchor-lang = { version = "0.29.0", features = ["init-if-needed"] }
+anchor-spl = "0.29.0"
+ephemeral-rollups-sdk = "0.2.1"
+
+[dev-dependencies]
+anchor-client = "0.29.0"
+solana-program-test = "~1.17"
+solana-sdk = "~1.17"
+spl-token = { version = "4.0.0", features = ["no-entrypoint"] }
