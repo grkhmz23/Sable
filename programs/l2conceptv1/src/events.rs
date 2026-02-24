@@ -15,7 +15,7 @@ pub struct JoinEvent {
 pub struct CompleteSetupEvent {
     pub owner: Pubkey,
     pub wsol_included: bool,
-    pub additional_mints_count: u8,
+    pub additional_mints: Vec<Pubkey>,
     pub total_balances: u8,
 }
 

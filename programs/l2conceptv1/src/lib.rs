@@ -62,8 +62,24 @@ pub mod l2conceptv1 {
     }
 
     /// Complete setup by creating UserState and wSOL UserBalance (always included by default)
-    /// Additional mints should be added via separate add_mint calls
-    pub fn complete_setup(ctx: Context<CompleteSetup>) -> Result<()> {
+    /// Additional mints can be added in the same transaction via remaining_accounts
+    pub fn complete_setup(
+        ctx: Context<CompleteSetup>,
+        additional_mints: Vec<Pubkey>,
+    ) -> Result<()> {
+        // Validate mint count
+        require!(
+            additional_mints.len() <= MAX_MINTS_PER_SETUP,
+            L2ConceptV1Error::TooManyMints
+        );
+
+        // Check for duplicates (including wSOL)
+        let mut mint_set = std::collections::HashSet::new();
+        for mint in &additional_mints {
+            require!(*mint != WSOL_MINT, L2ConceptV1Error::DuplicateMint);
+            require!(mint_set.insert(*mint), L2ConceptV1Error::DuplicateMint);
+        }
+
         // 1. Create UserState
         let user_state = &mut ctx.accounts.user_state;
         user_state.owner = ctx.accounts.owner.key();
@@ -78,11 +94,70 @@ pub mod l2conceptv1 {
         wsol_balance.amount = 0;
         wsol_balance.version = 0;
 
+        // 3. Validate and create additional UserBalance accounts from remaining_accounts
+        // Remaining accounts structure:
+        // [0..n]: Mint accounts (to validate)
+        // [n..2n]: UserBalance accounts (to initialize)
+        let remaining = ctx.remaining_accounts;
+        let n = additional_mints.len();
+        let owner_key = ctx.accounts.owner.key();
+
+        require!(
+            remaining.len() == n * 2,
+            L2ConceptV1Error::InvalidRecipientAccounts
+        );
+
+        for (i, mint_key) in additional_mints.iter().enumerate() {
+            // Validate mint account
+            let mint_acc = &remaining[i];
+            require!(mint_acc.key() == *mint_key, L2ConceptV1Error::InvalidMint);
+            require!(mint_acc.owner == &token::ID, L2ConceptV1Error::InvalidMint);
+
+            let mint_data = mint_acc.try_borrow_data()?;
+            require!(
+                mint_data.len() >= 82 && mint_data[0] == 1,
+                L2ConceptV1Error::InvalidMint
+            );
+            drop(mint_data);
+
+            // Initialize UserBalance account
+            let balance_acc = &remaining[n + i];
+
+            // Verify it's the expected PDA
+            let expected_seeds = &[
+                USER_BALANCE_SEED.as_bytes(),
+                owner_key.as_ref(),
+                mint_key.as_ref(),
+            ];
+            let (expected_pda, _bump) =
+                Pubkey::find_program_address(expected_seeds, ctx.program_id);
+            require!(
+                balance_acc.key() == expected_pda,
+                L2ConceptV1Error::InvalidRecipientAccounts
+            );
+
+            // Manually initialize the account data
+            // Structure: discriminator(8) + owner(32) + mint(32) + bump(1) + amount(8) + version(8) = 89 bytes
+            let mut data = balance_acc.try_borrow_mut_data()?;
+
+            // Discriminator - Anchor will set this, we skip first 8 bytes
+            // Owner
+            data[8..40].copy_from_slice(&owner_key.to_bytes());
+            // Mint
+            data[40..72].copy_from_slice(&mint_key.to_bytes());
+            // Bump
+            data[72] = _bump;
+            // Amount (0)
+            data[73..81].copy_from_slice(&0u64.to_le_bytes());
+            // Version (0)
+            data[81..89].copy_from_slice(&0u64.to_le_bytes());
+        }
+
         emit!(CompleteSetupEvent {
             owner: ctx.accounts.owner.key(),
             wsol_included: true,
-            additional_mints_count: 0,
-            total_balances: 1,
+            additional_mints: additional_mints.clone(),
+            total_balances: 1 + n as u8,
         });
 
         Ok(())

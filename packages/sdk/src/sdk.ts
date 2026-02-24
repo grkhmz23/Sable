@@ -154,26 +154,79 @@ export class L2ConceptSdk {
 
   /**
    * Complete setup - creates UserState and wSOL UserBalance (wSOL always included by default)
-   * Additional mints should be added via addMint() calls after this
+   * Additional mints can be included in the same transaction
+   * @param additionalMints - Optional array of mint addresses to also create balances for
    */
-  async completeSetup(): Promise<TransactionResult> {
+  async completeSetup(additionalMints: PublicKey[] = []): Promise<TransactionResult> {
     if (!this.isConnected) throw new Error('Wallet not connected');
 
     const owner = this.walletPublicKey!;
     const [userState] = this.pda.deriveUserState(owner);
     const [wsolBalance] = this.pda.deriveUserBalance(owner, this.wsolMint);
 
+    // Build remaining accounts for additional mints
+    // Format: [mint1, mint2, ..., balance1, balance2, ...]
+    const remainingAccounts: any[] = [];
+    
+    for (const mint of additionalMints) {
+      remainingAccounts.push({
+        pubkey: mint,
+        isWritable: false,
+        isSigner: false,
+      });
+    }
+
+    for (const mint of additionalMints) {
+      const [balancePda] = this.pda.deriveUserBalance(owner, mint);
+      remainingAccounts.push({
+        pubkey: balancePda,
+        isWritable: true,
+        isSigner: false,
+      });
+    }
+
     const tx = await this.program.methods
-      .completeSetup()
+      .completeSetup(additionalMints)
       .accounts({
         owner,
         userState,
         wsolBalance,
         systemProgram: SystemProgram.programId,
       })
+      .remainingAccounts(remainingAccounts)
       .transaction();
 
     return this.sendTransaction(tx);
+  }
+
+  /**
+   * Complete setup with multiple mints (convenience method)
+   * Validates all mints are valid public keys before sending
+   */
+  async completeSetupWithMints(mintStrings: string[]): Promise<TransactionResult> {
+    const mints = mintStrings
+      .map(s => s.trim())
+      .filter(s => s.length > 0)
+      .map(s => new PublicKey(s));
+    
+    // Check for duplicates
+    const uniqueMints = [...new Set(mints.map(m => m.toBase58()))].map(s => new PublicKey(s));
+    if (uniqueMints.length !== mints.length) {
+      throw new Error('Duplicate mint addresses found');
+    }
+
+    // Check for wSOL (it's always included, shouldn't be in the list)
+    const nonWsolMints = uniqueMints.filter(m => !m.equals(this.wsolMint));
+    if (nonWsolMints.length !== uniqueMints.length) {
+      console.log('wSOL removed from list (always included by default)');
+    }
+
+    // Check limit
+    if (nonWsolMints.length > 9) {
+      throw new Error('Maximum 9 additional mints allowed (wSOL is always included)');
+    }
+
+    return this.completeSetup(nonWsolMints);
   }
 
   /**
