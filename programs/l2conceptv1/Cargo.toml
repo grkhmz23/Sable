@@ -16,12 +16,13 @@ no-log-ix-name = []
 cpi = ["no-entrypoint"]
 
 [dependencies]
-anchor-lang = { version = "0.29.0", features = ["init-if-needed"] }
-anchor-spl = "0.29.0"
-ephemeral-rollups-sdk = "0.2.1"
+anchor-lang = { version = "0.32.1", features = ["init-if-needed"] }
+anchor-spl = "0.32.1"
+# Pin to avoid edition2024 issues
+blake3 = "=1.5.5"
 
 [dev-dependencies]
-anchor-client = "0.29.0"
-solana-program-test = "~1.17"
-solana-sdk = "~1.17"
+anchor-client = "0.32.1"
+solana-program-test = "~2.2"
+solana-sdk = "~2.2"
 spl-token = { version = "4.0.0", features = ["no-entrypoint"] }

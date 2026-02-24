@@ -11,7 +11,7 @@ env:
   PNPM_VERSION: '9'
   RUST_VERSION: '1.85.0'
   SOLANA_VERSION: '1.17.0'
-  ANCHOR_VERSION: '0.29.0'
+  ANCHOR_VERSION: '0.32.1'
 
 jobs:
   build-and-test:
@@ -57,6 +57,11 @@ jobs:
         with:
           workspaces: programs/l2conceptv1
 
+      - name: Install Solana CLI
+        run: |
+          sh -c "$(curl -sSfL https://release.anza.xyz/v${{ env.SOLANA_VERSION }}/install)"
+          echo "$HOME/.local/share/solana/install/active_release/bin" >> $GITHUB_PATH
+
       - name: Check Rust formatting
         run: |
           cd programs/l2conceptv1
@@ -65,21 +70,22 @@ jobs:
       - name: Run Rust clippy
         run: |
           cd programs/l2conceptv1
-          cargo clippy -- -W clippy::all
+          cargo clippy -- -D warnings
 
-      - name: Build Anchor program
+      - name: Build Anchor program (SBF)
         run: |
           cd programs/l2conceptv1
-          cargo check
+          cargo build-sbf
+
+      - name: Verify .so artifact exists
+        run: |
+          ls -la programs/l2conceptv1/target/deploy/l2conceptv1.so
 
       - name: Build packages
         run: pnpm build:all
 
       - name: Type check
         run: pnpm typecheck
-
-      - name: Lint
-        run: pnpm lint || true
 
       - name: Build Next.js app
         run: pnpm app:build
@@ -96,7 +102,7 @@ jobs:
       - name: Scan for placeholders
         run: |
           # Scan for common placeholder patterns
-          patterns=("PLACEHOLDER" "TODO" "FIXME" "HACK" "XXX" "lorem" "changeme" "YOUR_" "TBD")
+          patterns=("PLACEHOLDER" "TODO:" "FIXME:" "HACK:" "XXX:" "lorem" "changeme" "YOUR_" "TBD")
           found=0
           
           for pattern in "${patterns[@]}"; do

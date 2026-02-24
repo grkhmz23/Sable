@@ -1,6 +1,8 @@
+#![allow(unexpected_cfgs)]
+
 use anchor_lang::prelude::*;
 use anchor_spl::associated_token::AssociatedToken;
-use anchor_spl::token::{self, Mint, Token, TokenAccount, Transfer};
+use anchor_spl::token::{self, Token, TokenAccount, Transfer};
 
 pub mod error;
 pub mod events;
@@ -13,10 +15,8 @@ use state::*;
 declare_id!("L2CnccKT1qHNS1wJ7p3wJ3JhCX5s4J5wT5x3h5mH2j1");
 
 // Default MagicBlock delegation program ID (mainnet)
-pub const DEFAULT_DELEGATION_PROGRAM_ID: Pubkey = Pubkey::new_from_array([
-    222, 11, 231, 79, 80, 87, 101, 211, 160, 232, 164, 247, 84, 149, 89, 72, 34, 35, 178, 222, 106,
-    36, 40, 83, 174, 206, 137, 147, 19, 43, 18, 219,
-]);
+pub const DEFAULT_DELEGATION_PROGRAM_ID: Pubkey =
+    pubkey!("DELeGGvXpWV2fqJUhqcF5ZSYMS4JTLjteaAMARRSaeSh");
 
 #[program]
 pub mod l2conceptv1 {
@@ -206,11 +206,11 @@ pub mod l2conceptv1 {
                 L2ConceptV1Error::InvalidRecipientAccounts
             );
 
-            // Credit recipient using AccountLoader pattern for unchecked accounts
+            // Credit recipient using direct account data manipulation
             let mut recipient_balance_data = recipient_balance_info.try_borrow_mut_data()?;
 
-            // Deserialize manually since we can't use Account::try_from_unchecked easily
-            // Account structure: discriminator(8) + owner(32) + mint(32) + bump(1) + amount(8) + version(8)
+            // Account structure: discriminator(8) + owner(32) + mint(32) + bump(1) + amount(8) + version(8) = 89 bytes
+            // amount starts at byte 73, version at byte 81
             let current_amount = u64::from_le_bytes([
                 recipient_balance_data[73],
                 recipient_balance_data[74],

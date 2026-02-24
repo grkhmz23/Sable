@@ -9,6 +9,9 @@ build/
 .next/
 out/
 
+# TypeScript
+*.tsbuildinfo
+
 # Anchor
 .anchor/
 **/*.rs.bk
@@ -43,3 +46,6 @@ yarn-error.log*
 # Testing
 coverage/
 .nyc_output/
+
+# Next.js
+next-env.d.ts
