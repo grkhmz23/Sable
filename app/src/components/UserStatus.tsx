@@ -71,7 +71,13 @@ export function UserStatus() {
       await checkStatus();
     } catch (error: any) {
       console.error('Join error:', error);
-      toast.error(error.message || 'Failed to join');
+      const message = error?.message || String(error);
+      if (message.toLowerCase().includes('already in use')) {
+        toast('UserState already exists. Refreshing status...');
+        await checkStatus();
+      } else {
+        toast.error(message || 'Failed to join');
+      }
     } finally {
       setIsLoading(false);
     }
@@ -82,13 +88,28 @@ export function UserStatus() {
     setIsLoading(true);
 
     try {
-      const result = await sdk.completeSetup([]);
-      toast.success('Setup complete (wSOL enabled)');
-      console.log('Complete setup transaction:', result.signature);
+      // If UserState already exists (join-only path), create wSOL via addMint instead of
+      // calling completeSetup again (which would re-init UserState and fail).
+      let result;
+      if (hasJoined) {
+        result = await sdk.addMint(WSOL_MINT);
+        toast.success('wSOL balance PDA created');
+        console.log('wSOL add-mint transaction:', result.signature);
+      } else {
+        result = await sdk.completeSetup([]);
+        toast.success('Setup complete (wSOL enabled)');
+        console.log('Complete setup transaction:', result.signature);
+      }
       await checkStatus();
     } catch (error: any) {
       console.error('Complete setup error:', error);
-      toast.error(error.message || 'Failed to complete setup');
+      const message = error?.message || String(error);
+      if (message.toLowerCase().includes('already in use')) {
+        toast('Setup account already exists. Refreshing status...');
+        await checkStatus();
+      } else {
+        toast.error(message || 'Failed to complete setup');
+      }
     } finally {
       setIsLoading(false);
     }
@@ -189,9 +210,9 @@ export function UserStatus() {
               variant="secondary"
               onClick={handleJoin}
               isLoading={isLoading}
-              disabled={!sdk}
+              disabled={!sdk || hasJoined === true}
             >
-              Join Only
+              {hasJoined ? 'Already Joined' : 'Join Only'}
             </LuxuryButton>
             <LuxuryButton
               fullWidth

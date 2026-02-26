@@ -16,7 +16,7 @@ import toast from 'react-hot-toast';
 interface CompleteSetupModalProps {
   isOpen: boolean;
   onClose: () => void;
-  onComplete: () => void;
+  onComplete: () => Promise<void> | void;
 }
 
 export function CompleteSetupModal({
@@ -69,12 +69,55 @@ export function CompleteSetupModal({
         return;
       }
 
-      const result = await sdk.completeSetupWithMints(filteredMints);
+      const mintPubkeys = filteredMints.map((m) => new PublicKey(m));
+      const owner = sdk.walletPublicKey;
+      if (!owner) {
+        toast.error('Wallet not connected');
+        return;
+      }
+
+      let setupTxSig: string | null = null;
+      let addedCount = 0;
+      let skippedCount = 0;
+
+      const userState = await sdk.getUserState(owner);
+      if (!userState) {
+        // Current program supports complete_setup only as first-time initialization.
+        const result = await sdk.completeSetup([]);
+        setupTxSig = result.signature;
+        console.log('Complete setup transaction:', result.signature);
+      }
+
+      const wsolBalance = await sdk.getUserBalance(owner, WSOL_MINT);
+      if (!wsolBalance) {
+        const result = await sdk.addMint(WSOL_MINT);
+        if (!setupTxSig) {
+          setupTxSig = result.signature;
+          console.log('wSOL setup transaction:', result.signature);
+        } else {
+          console.log('wSOL add-mint transaction:', result.signature);
+        }
+      }
+
+      for (const mint of mintPubkeys) {
+        const existing = await sdk.getUserBalance(owner, mint);
+        if (existing) {
+          skippedCount += 1;
+          continue;
+        }
+
+        const result = await sdk.addMint(mint);
+        console.log('Add mint transaction:', mint.toBase58(), result.signature);
+        addedCount += 1;
+      }
+
+      const totalReady = 1 + filteredMints.length; // wSOL + requested additional mints
       toast.success(
-        `Setup complete. Created ${1 + filteredMints.length} balance PDA(s), including wSOL.`
+        skippedCount > 0
+          ? `Setup synced. ${addedCount} mint(s) added, ${skippedCount} already existed. Total target: ${totalReady}.`
+          : `Setup complete. ${addedCount} additional mint(s) added${setupTxSig ? ' and base setup initialized' : ''}.`
       );
-      console.log('Complete setup transaction:', result.signature);
-      onComplete();
+      await onComplete();
       onClose();
     } catch (error: any) {
       console.error('Complete setup error:', error);
