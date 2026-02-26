@@ -1,14 +1,16 @@
 'use client';
 
-import React, { useEffect, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { PublicKey } from '@solana/web3.js';
 import { L2ConceptSdk, DelegationStatus } from '@l2conceptv1/sdk';
+import { GlassPanel, LuxuryButton, Pill, truncateAddress, cn } from '@/components/ui/luxury';
 
 interface DelegationStatusProps {
   sdk: L2ConceptSdk | null;
   owner: PublicKey | null;
   mints: PublicKey[];
   refreshInterval?: number;
+  embedded?: boolean;
 }
 
 export function DelegationStatusComponent({
@@ -16,10 +18,17 @@ export function DelegationStatusComponent({
   owner,
   mints,
   refreshInterval = 30000,
+  embedded = false,
 }: DelegationStatusProps) {
   const [status, setStatus] = useState<DelegationStatus[]>([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+
+  const mintsKey = useMemo(
+    () => mints.map((m) => m.toBase58()).sort().join(','),
+    [mints]
+  );
+  const ownerKey = owner?.toBase58() ?? '';
 
   const fetchStatus = async () => {
     if (!sdk || !owner) return;
@@ -43,90 +52,96 @@ export function DelegationStatusComponent({
       const interval = setInterval(fetchStatus, refreshInterval);
       return () => clearInterval(interval);
     }
-  }, [sdk, owner, mints.join(','), refreshInterval]);
+  }, [sdk, ownerKey, mintsKey, refreshInterval]);
 
   const delegatedCount = status.filter((s) => s.isDelegated).length;
   const totalCount = status.length;
+  const widthPct = totalCount > 0 ? (delegatedCount / totalCount) * 100 : 0;
 
   if (!sdk || !owner) {
     return null;
   }
 
-  return (
-    <div className="bg-gray-900/50 rounded-lg p-4 border border-gray-700">
-      <div className="flex items-center justify-between mb-4">
-        <h3 className="text-lg font-semibold text-white">Delegation Status</h3>
-        <button
-          onClick={fetchStatus}
-          disabled={loading}
-          className="text-sm text-blue-400 hover:text-blue-300 disabled:opacity-50"
-        >
-          {loading ? 'Refreshing...' : 'Refresh'}
-        </button>
+  const body = (
+    <div className={cn('p-4', embedded ? 'rounded-2xl border border-white/8 bg-black/30' : '')}>
+      <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+        <div>
+          <p className="text-[10px] uppercase tracking-[0.25em] text-zinc-500">
+            Delegation Status
+          </p>
+          <p className="mt-1 text-sm text-zinc-300">
+            {delegatedCount} of {totalCount} tracked account(s) delegated
+          </p>
+          <p className="mt-1 text-xs text-zinc-500">
+            Includes `UserState` plus {mints.length} mint balance account(s)
+          </p>
+        </div>
+        <div className="flex flex-wrap items-center gap-2">
+          {delegatedCount > 0 ? <Pill tone="amber">Withdrawals blocked</Pill> : <Pill>Withdrawals available</Pill>}
+          <LuxuryButton
+            variant="secondary"
+            className="px-4 py-2"
+            onClick={fetchStatus}
+            isLoading={loading}
+          >
+            Refresh
+          </LuxuryButton>
+        </div>
       </div>
 
-      {error && (
-        <div className="mb-4 p-3 bg-red-900/30 border border-red-700 rounded text-red-300 text-sm">
-          {error}
-        </div>
-      )}
-
-      <div className="mb-4">
-        <div className="flex items-center justify-between text-sm">
-          <span className="text-gray-400">
-            {delegatedCount} of {totalCount} accounts delegated
-          </span>
-          {delegatedCount > 0 && (
-            <span className="text-yellow-400 text-xs">
-              ⚠️ Withdrawals blocked while delegated
-            </span>
-          )}
-        </div>
-        <div className="mt-2 h-2 bg-gray-700 rounded-full overflow-hidden">
+      <div className="mt-4">
+        <div className="h-2 overflow-hidden rounded-full bg-white/6">
           <div
-            className={`h-full transition-all duration-300 ${
-              delegatedCount === totalCount
-                ? 'bg-green-500'
+            className={cn(
+              'h-full transition-all duration-300',
+              delegatedCount === totalCount && totalCount > 0
+                ? 'bg-emerald-300/80'
                 : delegatedCount > 0
-                ? 'bg-yellow-500'
-                : 'bg-gray-500'
-            }`}
-            style={{ width: `${totalCount > 0 ? (delegatedCount / totalCount) * 100 : 0}%` }}
+                ? 'bg-amber-300/80'
+                : 'bg-zinc-500/50'
+            )}
+            style={{ width: `${widthPct}%` }}
           />
         </div>
       </div>
 
-      {status.length > 0 && (
-        <div className="space-y-2 max-h-48 overflow-y-auto">
-          {status.map((item) => (
+      {error ? (
+        <div className="mt-4 rounded-xl border border-rose-300/15 bg-rose-300/5 p-3 text-sm text-rose-200">
+          {error}
+        </div>
+      ) : null}
+
+      {status.length > 0 ? (
+        <div className="mt-4 max-h-56 space-y-2 overflow-auto pr-1 l2-subtle-scrollbar">
+          {status.map((item, idx) => (
             <div
               key={item.account.toBase58()}
-              className="flex items-center justify-between p-2 bg-gray-800/50 rounded text-sm"
+              className="flex flex-col gap-2 rounded-xl border border-white/6 bg-white/[0.02] p-3 sm:flex-row sm:items-center sm:justify-between"
             >
-              <span className="font-mono text-xs text-gray-400 truncate max-w-[200px]">
-                {item.account.toBase58().slice(0, 8)}...{item.account.toBase58().slice(-8)}
-              </span>
-              <span
-                className={`text-xs px-2 py-1 rounded ${
-                  item.isDelegated
-                    ? 'bg-green-900/50 text-green-400'
-                    : 'bg-gray-700 text-gray-400'
-                }`}
-              >
+              <div className="min-w-0">
+                <p className="text-[10px] uppercase tracking-[0.18em] text-zinc-500">
+                  {idx === 0 ? 'UserState' : `UserBalance #${idx}`}
+                </p>
+                <p className="mt-1 font-mono text-xs text-zinc-300">
+                  {truncateAddress(item.account.toBase58(), 12, 12)}
+                </p>
+              </div>
+              <Pill tone={item.isDelegated ? 'green' : 'default'}>
                 {item.isDelegated ? 'Delegated' : 'L1'}
-              </span>
+              </Pill>
             </div>
           ))}
         </div>
-      )}
+      ) : null}
 
-      <div className="mt-4 p-3 bg-blue-900/20 border border-blue-800 rounded text-sm text-blue-300">
-        <p className="font-medium mb-1">About Delegation</p>
-        <p className="text-xs text-blue-400/80">
-          Delegating to MagicBlock Ephemeral Rollup enables fast, low-cost transactions.
-          Accounts must be undelegated before withdrawing to L1.
+      <div className="mt-4 rounded-xl border border-white/6 bg-white/[0.02] p-3">
+        <p className="text-xs text-zinc-400">
+          Delegation detection checks whether each account owner equals the MagicBlock delegation program. If delegation requests are event-based, status updates depend on the MagicBlock indexer/validator applying changes.
         </p>
       </div>
     </div>
   );
+
+  if (embedded) return body;
+  return <GlassPanel>{body}</GlassPanel>;
 }

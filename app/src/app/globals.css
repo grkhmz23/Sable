@@ -3,31 +3,131 @@
 @tailwind utilities;
 
 :root {
-  --foreground-rgb: 0, 0, 0;
-  --background-start-rgb: 214, 219, 220;
-  --background-end-rgb: 255, 255, 255;
-}
-
-@media (prefers-color-scheme: dark) {
-  :root {
-    --foreground-rgb: 255, 255, 255;
-    --background-start-rgb: 0, 0, 0;
-    --background-end-rgb: 0, 0, 0;
-  }
+  --l2-bg: #030303;
+  --l2-panel: rgba(255, 255, 255, 0.03);
+  --l2-border: rgba(255, 255, 255, 0.08);
+  --l2-text: #f3f4f6;
+  --l2-muted: #a1a1aa;
+  --l2-accent: #d6be70;
+  --l2-accent-2: #bf953f;
+  --l2-danger: #fb7185;
 }
 
 body {
-  color: rgb(var(--foreground-rgb));
-  background: linear-gradient(
-      to bottom,
-      transparent,
-      rgb(var(--background-end-rgb))
-    )
-    rgb(var(--background-start-rgb));
+  color: var(--l2-text);
+  background: var(--l2-bg);
+  min-height: 100vh;
+  font-family: var(--font-sans), sans-serif;
+}
+
+h1,
+h2,
+h3,
+h4 {
+  font-family: var(--font-display), serif;
+  letter-spacing: -0.01em;
+}
+
+code,
+pre,
+.font-mono {
+  font-family: var(--font-mono), monospace;
+}
+
+::selection {
+  background: rgba(214, 190, 112, 0.26);
+  color: #fffdf0;
+}
+
+@layer base {
+  * {
+    @apply border-zinc-800;
+  }
+
+  button:focus-visible,
+  input:focus-visible,
+  textarea:focus-visible,
+  select:focus-visible {
+    outline: 2px solid rgba(214, 190, 112, 0.45);
+    outline-offset: 2px;
+  }
+}
+
+@layer components {
+  .l2-shell {
+    position: relative;
+    min-height: 100vh;
+    background:
+      radial-gradient(40rem 28rem at 10% -5%, rgba(191, 149, 63, 0.16), transparent 70%),
+      radial-gradient(34rem 26rem at 92% 20%, rgba(252, 246, 186, 0.08), transparent 68%),
+      radial-gradient(44rem 36rem at 75% 100%, rgba(179, 135, 40, 0.10), transparent 70%),
+      linear-gradient(180deg, #030303 0%, #060606 45%, #030303 100%);
+  }
+
+  .l2-grid-overlay {
+    position: absolute;
+    inset: 0;
+    pointer-events: none;
+    background-image:
+      linear-gradient(rgba(255, 255, 255, 0.03) 1px, transparent 1px),
+      linear-gradient(90deg, rgba(255, 255, 255, 0.03) 1px, transparent 1px);
+    background-size: 44px 44px;
+    mask-image: radial-gradient(circle at center, black 35%, transparent 90%);
+    opacity: 0.28;
+  }
+
+  .l2-noise-overlay {
+    position: absolute;
+    inset: 0;
+    pointer-events: none;
+    opacity: 0.03;
+    background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 200 200' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.75' numOctaves='3' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E");
+  }
+
+  .l2-divider {
+    height: 1px;
+    background: linear-gradient(90deg, transparent, rgba(255, 255, 255, 0.12), transparent);
+  }
+
+  .l2-subtle-scrollbar {
+    scrollbar-width: thin;
+    scrollbar-color: rgba(214, 190, 112, 0.22) transparent;
+  }
+
+  .l2-subtle-scrollbar::-webkit-scrollbar {
+    width: 6px;
+    height: 6px;
+  }
+
+  .l2-subtle-scrollbar::-webkit-scrollbar-track {
+    background: transparent;
+  }
+
+  .l2-subtle-scrollbar::-webkit-scrollbar-thumb {
+    background: rgba(255, 255, 255, 0.12);
+    border-radius: 9999px;
+  }
+
+  .l2-subtle-scrollbar::-webkit-scrollbar-thumb:hover {
+    background: rgba(214, 190, 112, 0.24);
+  }
 }
 
 @layer utilities {
   .text-balance {
     text-wrap: balance;
+  }
+
+  .font-display {
+    font-family: var(--font-display), serif;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  * {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+    scroll-behavior: auto !important;
   }
 }

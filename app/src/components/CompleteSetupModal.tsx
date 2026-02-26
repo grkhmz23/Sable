@@ -1,8 +1,16 @@
 'use client';
 
-import { useState } from 'react';
+import { useMemo, useState } from 'react';
 import { useWalletContext } from '@/contexts/WalletContext';
+import { PublicKey } from '@solana/web3.js';
 import { WSOL_MINT } from '@l2conceptv1/sdk';
+import {
+  GlassPanel,
+  LuxuryButton,
+  LuxuryTextarea,
+  Pill,
+  truncateAddress,
+} from '@/components/ui/luxury';
 import toast from 'react-hot-toast';
 
 interface CompleteSetupModalProps {
@@ -11,54 +19,61 @@ interface CompleteSetupModalProps {
   onComplete: () => void;
 }
 
-export function CompleteSetupModal({ isOpen, onClose, onComplete }: CompleteSetupModalProps) {
+export function CompleteSetupModal({
+  isOpen,
+  onClose,
+  onComplete,
+}: CompleteSetupModalProps) {
   const { sdk } = useWalletContext();
   const [mintInput, setMintInput] = useState('');
   const [isLoading, setIsLoading] = useState(false);
-  const [parsedMints, setParsedMints] = useState<string[]>([]);
 
-  const parseMints = (input: string): string[] => {
-    return input
-      .split(/[\n,]+/)
-      .map(s => s.trim())
-      .filter(s => s.length > 0);
-  };
+  const parsedMints = useMemo(
+    () =>
+      mintInput
+        .split(/[\n,]+/)
+        .map((s) => s.trim())
+        .filter((s) => s.length > 0),
+    [mintInput]
+  );
 
-  const handleInputChange = (value: string) => {
-    setMintInput(value);
-    setParsedMints(parseMints(value));
-  };
+  const filteredMints = useMemo(
+    () => parsedMints.filter((m) => m !== WSOL_MINT.toBase58()),
+    [parsedMints]
+  );
+
+  const duplicateCount = useMemo(() => {
+    const uniq = new Set(filteredMints.map((m) => m));
+    return filteredMints.length - uniq.size;
+  }, [filteredMints]);
 
   const handleSubmit = async () => {
     if (!sdk) return;
 
     setIsLoading(true);
     try {
-      // Filter out wSOL if user added it (it's always included)
-      const mints = parsedMints.filter(m => m !== WSOL_MINT.toBase58());
-      
-      if (mints.length > 9) {
+      if (filteredMints.length > 9) {
         toast.error('Maximum 9 additional mints allowed');
-        setIsLoading(false);
         return;
       }
 
-      // Validate all mints are valid public keys
+      if (duplicateCount > 0) {
+        toast.error('Duplicate mint addresses found');
+        return;
+      }
+
       try {
-        mints.forEach(m => new (require('@solana/web3.js').PublicKey)(m));
+        filteredMints.forEach((m) => new PublicKey(m));
       } catch {
         toast.error('Invalid mint address found');
-        setIsLoading(false);
         return;
       }
 
-      const result = await sdk.completeSetupWithMints(mints);
-      
+      const result = await sdk.completeSetupWithMints(filteredMints);
       toast.success(
-        `Setup complete! Created ${1 + mints.length} balance account(s) including wSOL.`
+        `Setup complete. Created ${1 + filteredMints.length} balance PDA(s), including wSOL.`
       );
       console.log('Complete setup transaction:', result.signature);
-      
       onComplete();
       onClose();
     } catch (error: any) {
@@ -72,81 +87,106 @@ export function CompleteSetupModal({ isOpen, onClose, onComplete }: CompleteSetu
   if (!isOpen) return null;
 
   return (
-    <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
-      <div className="bg-white rounded-lg p-6 max-w-lg w-full mx-4">
-        <h3 className="text-xl font-semibold mb-2">Complete Setup</h3>
-        
-        <div className="mb-4 p-3 bg-blue-50 border border-blue-200 rounded-md">
-          <p className="text-sm text-blue-800">
-            <strong>wSOL is always included by default.</strong>
-          </p>
-          <p className="text-sm text-blue-700 mt-1">
-            Add up to 9 additional token mints to track in your vault.
-          </p>
+    <div className="fixed inset-0 z-[60] flex items-center justify-center p-4">
+      <div className="absolute inset-0 bg-black/75 backdrop-blur-xl" onClick={onClose} />
+      <GlassPanel className="relative w-full max-w-2xl p-6 md:p-8" highlight>
+        <div className="flex items-start justify-between gap-4">
+          <div>
+            <p className="text-[10px] uppercase tracking-[0.3em] text-amber-200/70">
+              Complete Setup
+            </p>
+            <h3 className="mt-2 text-2xl text-white md:text-3xl">
+              Initialize Balance PDAs
+            </h3>
+            <p className="mt-3 text-sm text-zinc-400">
+              wSOL is always included. Add up to 9 extra mint addresses to create balance PDAs in the same setup flow.
+            </p>
+          </div>
+          <LuxuryButton variant="ghost" className="px-3 py-2" onClick={onClose}>
+            Close
+          </LuxuryButton>
         </div>
 
-        <div className="mb-4">
-          <label className="block text-sm font-medium mb-1">
-            Additional Token Mints (optional)
-          </label>
-          <textarea
+        <div className="mt-6 grid gap-4 md:grid-cols-2">
+          <div className="rounded-2xl border border-white/8 bg-black/35 p-4">
+            <p className="text-[10px] uppercase tracking-[0.2em] text-zinc-500">Default Mint</p>
+            <div className="mt-3 flex flex-wrap items-center gap-2">
+              <Pill tone="amber">wSOL</Pill>
+              <span className="font-mono text-xs text-zinc-400">
+                {truncateAddress(WSOL_MINT.toBase58(), 14, 10)}
+              </span>
+            </div>
+          </div>
+          <div className="rounded-2xl border border-white/8 bg-black/35 p-4">
+            <p className="text-[10px] uppercase tracking-[0.2em] text-zinc-500">Current Selection</p>
+            <p className="mt-3 text-white">
+              {1 + filteredMints.length} total balance PDA(s)
+            </p>
+            <p className="mt-1 text-xs text-zinc-500">
+              1 default wSOL + {filteredMints.length} additional mints
+            </p>
+          </div>
+        </div>
+
+        <div className="mt-6">
+          <LuxuryTextarea
+            label="Additional Token Mints (optional)"
+            hint="comma or newline separated"
+            rows={7}
             value={mintInput}
-            onChange={(e) => handleInputChange(e.target.value)}
-            placeholder="Enter mint addresses, separated by commas or new lines...&#10;Example:&#10;EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v&#10;Es9vMFrzaCERmJfrF4H2FYD4KCoNkY11McCe8BenwNY"
-            rows={6}
-            className="w-full px-3 py-2 border rounded-md focus:ring-2 focus:ring-primary-500 font-mono text-sm"
+            onChange={(e) => setMintInput(e.target.value)}
+            placeholder={
+              'EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v\nEs9vMFrzaCERmJfrF4H2FYD4KCoNkY11McCe8BenwNYB'
+            }
+            error={
+              filteredMints.length > 9
+                ? 'Maximum 9 additional mints allowed'
+                : duplicateCount > 0
+                ? 'Duplicate mint addresses detected'
+                : null
+            }
+            className="min-h-[180px]"
           />
         </div>
 
-        {parsedMints.length > 0 && (
-          <div className="mb-4 p-3 bg-gray-50 rounded-md">
-            <p className="text-sm font-medium text-gray-700">
-              Will create {parsedMints.length} additional balance(s) + wSOL:
+        {filteredMints.length > 0 ? (
+          <div className="mt-5 rounded-2xl border border-white/8 bg-black/35 p-4">
+            <p className="text-[10px] uppercase tracking-[0.2em] text-zinc-500">
+              Preview ({filteredMints.length} additional)
             </p>
-            <ul className="mt-2 space-y-1">
-              <li className="text-sm flex items-center gap-2">
-                <span className="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-blue-100 text-blue-800">
-                  wSOL
-                </span>
-                <span className="font-mono text-xs text-gray-500">
-                  {WSOL_MINT.toBase58().slice(0, 16)}...
-                </span>
-              </li>
-              {parsedMints.slice(0, 5).map((mint, idx) => (
-                <li key={idx} className="text-sm font-mono text-gray-600 truncate">
-                  {mint.slice(0, 20)}...
-                </li>
+            <div className="mt-3 grid gap-2">
+              {filteredMints.slice(0, 6).map((mint) => (
+                <div
+                  key={mint}
+                  className="rounded-xl border border-white/6 bg-white/[0.02] px-3 py-2 font-mono text-xs text-zinc-300"
+                >
+                  {truncateAddress(mint, 16, 12)}
+                </div>
               ))}
-              {parsedMints.length > 5 && (
-                <li className="text-sm text-gray-500">
-                  ... and {parsedMints.length - 5} more
-                </li>
-              )}
-            </ul>
+              {filteredMints.length > 6 ? (
+                <p className="text-xs text-zinc-500">
+                  + {filteredMints.length - 6} more mint(s)
+                </p>
+              ) : null}
+            </div>
           </div>
-        )}
+        ) : null}
 
-        <div className="flex gap-3 justify-end">
-          <button
-            onClick={onClose}
-            disabled={isLoading}
-            className="px-4 py-2 text-gray-600 hover:text-gray-800 disabled:opacity-50"
-          >
+        <div className="mt-6 flex flex-col-reverse gap-3 sm:flex-row sm:justify-end">
+          <LuxuryButton variant="secondary" onClick={onClose} disabled={isLoading}>
             Cancel
-          </button>
-          <button
+          </LuxuryButton>
+          <LuxuryButton
             onClick={handleSubmit}
-            disabled={isLoading || parsedMints.length > 9}
-            className="px-4 py-2 bg-primary-600 text-white rounded-md hover:bg-primary-700 disabled:opacity-50 disabled:cursor-not-allowed"
+            isLoading={isLoading}
+            disabled={filteredMints.length > 9 || duplicateCount > 0}
           >
-            {isLoading
-              ? 'Setting up...'
-              : parsedMints.length === 0
+            {filteredMints.length === 0
               ? 'Complete Setup (wSOL only)'
-              : `Complete Setup (${1 + parsedMints.length} tokens)`}
-          </button>
+              : `Complete Setup (${1 + filteredMints.length} mints)`}
+          </LuxuryButton>
         </div>
-      </div>
+      </GlassPanel>
     </div>
   );
 }

@@ -5,46 +5,77 @@ import { useWalletContext } from '@/contexts/WalletContext';
 import { useWallet } from '@solana/wallet-adapter-react';
 import { PublicKey } from '@solana/web3.js';
 import { WSOL_MINT } from '@l2conceptv1/sdk';
+import {
+  GlassPanel,
+  LuxuryButton,
+  LuxuryInput,
+  Pill,
+  SectionHeader,
+  truncateAddress,
+} from '@/components/ui/luxury';
 import toast from 'react-hot-toast';
 
 interface BalanceInfo {
+  pubkey?: PublicKey;
   mint: PublicKey;
   amount: string;
   version: string;
   isWsol: boolean;
+  isDelegated?: boolean;
 }
 
 export function BalanceList() {
-  const { sdk } = useWalletContext();
+  const { sdk, solanaSdk } = useWalletContext();
   const { publicKey } = useWallet();
   const [balances, setBalances] = useState<BalanceInfo[]>([]);
   const [newMint, setNewMint] = useState('');
   const [isLoading, setIsLoading] = useState(false);
+  const [isRefreshing, setIsRefreshing] = useState(false);
 
   const fetchBalances = useCallback(async () => {
     if (!sdk || !publicKey) return;
 
+    setIsRefreshing(true);
     try {
       const allBalances = await sdk.getAllUserBalances(publicKey);
-      const formatted = allBalances.map((b: any) => ({
+      const baseList: BalanceInfo[] = allBalances.map((b: any) => ({
+        pubkey: b.publicKey,
         mint: b.account.mint,
         amount: b.account.amount.toString(),
         version: b.account.version.toString(),
         isWsol: b.account.mint.toBase58() === WSOL_MINT.toBase58(),
       }));
-      
-      // Sort: wSOL first, then others
-      formatted.sort((a: BalanceInfo, b: BalanceInfo) => {
+
+      if (solanaSdk) {
+        const delegatedFlags = await Promise.all(
+          baseList.map(async (row) => {
+            if (!row.pubkey) return false;
+            try {
+              return await solanaSdk.isDelegated(row.pubkey);
+            } catch {
+              return false;
+            }
+          })
+        );
+
+        baseList.forEach((row, idx) => {
+          row.isDelegated = delegatedFlags[idx];
+        });
+      }
+
+      baseList.sort((a, b) => {
         if (a.isWsol && !b.isWsol) return -1;
         if (!a.isWsol && b.isWsol) return 1;
-        return 0;
+        return a.mint.toBase58().localeCompare(b.mint.toBase58());
       });
-      
-      setBalances(formatted);
+
+      setBalances(baseList);
     } catch (error) {
       console.error('Error fetching balances:', error);
+    } finally {
+      setIsRefreshing(false);
     }
-  }, [sdk, publicKey]);
+  }, [sdk, solanaSdk, publicKey]);
 
   useEffect(() => {
     fetchBalances();
@@ -57,7 +88,7 @@ export function BalanceList() {
     try {
       const mintPubkey = new PublicKey(newMint.trim());
       const result = await sdk.addMint(mintPubkey);
-      toast.success('Mint added successfully!');
+      toast.success('Mint added successfully');
       console.log('Add mint transaction:', result.signature);
       setNewMint('');
       await fetchBalances();
@@ -69,83 +100,136 @@ export function BalanceList() {
     }
   };
 
-  const formatAmount = (amount: string, decimals: number = 9) => {
-    const num = parseInt(amount) / Math.pow(10, decimals);
-    return num.toLocaleString(undefined, { maximumFractionDigits: decimals });
+  const formatAmount = (amount: string, decimals = 9) => {
+    const raw = Number(amount);
+    if (!Number.isFinite(raw)) return amount;
+    return (raw / Math.pow(10, decimals)).toLocaleString(undefined, {
+      maximumFractionDigits: 9,
+    });
   };
 
   return (
-    <div className="p-6 bg-white rounded-lg shadow-md">
-      <h2 className="text-xl font-semibold mb-4">Balances</h2>
+    <GlassPanel className="p-6 md:p-7">
+      <SectionHeader
+        eyebrow="Vault Ledger"
+        title="Tracked Asset Balances"
+        subtitle="Per-user/per-mint ledger PDAs shown below. Internal transfers update these balances without moving SPL tokens."
+        action={
+          <LuxuryButton
+            variant="secondary"
+            className="px-4 py-2"
+            onClick={() => fetchBalances()}
+            isLoading={isRefreshing}
+          >
+            Refresh
+          </LuxuryButton>
+        }
+      />
 
-      <div className="mb-4 flex gap-2">
-        <input
-          type="text"
-          placeholder="Enter mint address..."
-          value={newMint}
-          onChange={(e) => setNewMint(e.target.value)}
-          className="flex-1 px-3 py-2 border rounded-md focus:ring-2 focus:ring-primary-500"
+      <div className="mt-6 grid gap-3 sm:grid-cols-3">
+        <SummaryChip label="Tracked Mints" value={String(balances.length)} />
+        <SummaryChip
+          label="wSOL Ready"
+          value={balances.some((b) => b.isWsol) ? 'Yes' : 'No'}
+          tone={balances.some((b) => b.isWsol) ? 'green' : 'amber'}
         />
-        <button
-          onClick={handleAddMint}
-          disabled={isLoading || !newMint.trim()}
-          className="px-4 py-2 bg-primary-600 text-white rounded-md hover:bg-primary-700 disabled:opacity-50"
-        >
-          {isLoading ? 'Adding...' : 'Add Mint'}
-        </button>
+        <SummaryChip
+          label="Delegated Balances"
+          value={String(balances.filter((b) => b.isDelegated).length)}
+          tone="amber"
+        />
       </div>
 
-      {balances.length === 0 ? (
-        <div className="space-y-2">
-          <p className="text-gray-500">No balances yet.</p>
-          <p className="text-sm text-yellow-600">
-            ⚠️ wSOL balance not found. Complete setup to enable wSOL support.
-          </p>
+      <div className="mt-6 rounded-2xl border border-white/8 bg-black/30 p-4">
+        <div className="grid gap-3 sm:grid-cols-[1fr_auto]">
+          <LuxuryInput
+            label="Add Mint"
+            placeholder="Enter mint address"
+            value={newMint}
+            onChange={(e) => setNewMint(e.target.value)}
+          />
+          <div className="flex items-end">
+            <LuxuryButton
+              fullWidth
+              onClick={handleAddMint}
+              isLoading={isLoading}
+              disabled={!newMint.trim()}
+              className="sm:min-w-[180px]"
+            >
+              Add Mint
+            </LuxuryButton>
+          </div>
         </div>
-      ) : !balances.some(b => b.isWsol) ? (
-        <div className="mb-4 p-3 bg-yellow-50 border border-yellow-200 rounded-md">
-          <p className="text-sm text-yellow-800">
-            ⚠️ wSOL not set up. Complete setup to add wSOL balance.
-          </p>
-        </div>
-      ) : (
-        <div className="overflow-x-auto">
-          <table className="w-full">
-            <thead>
-              <tr className="border-b">
-                <th className="text-left py-2 px-4">Mint</th>
-                <th className="text-right py-2 px-4">Amount</th>
-                <th className="text-right py-2 px-4">Version</th>
-              </tr>
-            </thead>
-            <tbody>
-              {balances.map((balance, idx) => (
-                <tr key={idx} className="border-b last:border-b-0">
-                  <td className="py-2 px-4">
-                    <div className="flex items-center gap-2">
-                      <span className="font-mono text-sm">
-                        {balance.mint.toBase58().slice(0, 8)}...
-                        {balance.mint.toBase58().slice(-8)}
-                      </span>
-                      {balance.isWsol && (
-                        <span className="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-blue-100 text-blue-800">
-                          wSOL
-                        </span>
-                      )}
+      </div>
+
+      <div className="mt-6">
+        {balances.length === 0 ? (
+          <div className="rounded-2xl border border-white/8 bg-black/30 p-5">
+            <p className="text-sm text-zinc-300">No ledger balances found yet.</p>
+            <p className="mt-2 text-xs text-zinc-500">
+              Complete setup to create the default wSOL balance PDA, then add additional mints as needed.
+            </p>
+          </div>
+        ) : (
+          <div className="max-h-[420px] space-y-2 overflow-auto pr-1 l2-subtle-scrollbar">
+            {balances.map((balance) => (
+              <div
+                key={balance.mint.toBase58()}
+                className="group rounded-2xl border border-white/6 bg-white/[0.02] p-4 transition hover:border-white/12 hover:bg-white/[0.035]"
+              >
+                <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+                  <div className="min-w-0">
+                    <div className="flex flex-wrap items-center gap-2">
+                      <p className="font-mono text-sm text-zinc-100">
+                        {truncateAddress(balance.mint.toBase58(), 10, 10)}
+                      </p>
+                      {balance.isWsol ? <Pill tone="amber">wSOL Default</Pill> : null}
+                      {typeof balance.isDelegated === 'boolean' ? (
+                        <Pill tone={balance.isDelegated ? 'green' : 'default'}>
+                          {balance.isDelegated ? 'Delegated' : 'L1'}
+                        </Pill>
+                      ) : null}
                     </div>
-                  </td>
-                  <td className="py-2 px-4 text-right">
-                    {formatAmount(balance.amount)}
-                  </td>
-                  <td className="py-2 px-4 text-right text-gray-500">
-                    {balance.version}
-                  </td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        </div>
-      )}
+                    <p className="mt-1 text-xs text-zinc-500">
+                      Ledger version{' '}
+                      <span className="font-mono text-zinc-400">{balance.version}</span>
+                    </p>
+                  </div>
+
+                  <div className="text-left sm:text-right">
+                    <p className="text-lg text-white">{formatAmount(balance.amount)}</p>
+                    <p className="font-mono text-xs text-zinc-500">{balance.amount} raw</p>
+                  </div>
+                </div>
+              </div>
+            ))}
+          </div>
+        )}
+      </div>
+    </GlassPanel>
+  );
+}
+
+function SummaryChip({
+  label,
+  value,
+  tone = 'default',
+}: {
+  label: string;
+  value: string;
+  tone?: 'default' | 'green' | 'amber';
+}) {
+  const toneClasses =
+    tone === 'green'
+      ? 'border-emerald-300/10 bg-emerald-300/5'
+      : tone === 'amber'
+      ? 'border-amber-300/10 bg-amber-300/5'
+      : 'border-white/8 bg-white/[0.02]';
+
+  return (
+    <div className={`rounded-2xl border p-4 ${toneClasses}`}>
+      <p className="text-[10px] uppercase tracking-[0.2em] text-zinc-500">{label}</p>
+      <p className="mt-2 text-lg text-white">{value}</p>
     </div>
   );
 }
