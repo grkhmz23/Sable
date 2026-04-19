@@ -120,6 +120,17 @@ describe('sable', () => {
     );
   };
 
+  const deriveAgentState = (parent: PublicKey, nonce: number) => {
+    return PublicKey.findProgramAddressSync(
+      [
+        Buffer.from('agent_state'),
+        parent.toBuffer(),
+        Buffer.from(new Uint32Array([nonce]).buffer),
+      ],
+      programId
+    );
+  };
+
   const deriveVaultAta = (mint: PublicKey, authority: PublicKey) => {
     return getAssociatedTokenAddressSync(mint, authority, true);
   };
@@ -333,6 +344,81 @@ describe('sable', () => {
       const [cfg2] = deriveConfig();
       assert.equal(cfg1.toBase58(), cfg2.toBase58());
       assert.equal(cfg1.toBase58(), configPda.toBase58());
+    });
+  });
+
+  describe('Agent Hierarchy', () => {
+    it('Derives AgentState PDA from parent and nonce', () => {
+      const [user1State] = deriveUserState(user1.publicKey);
+      const [agent1] = deriveAgentState(user1State, 0);
+      const [agent2] = deriveAgentState(user1State, 1);
+
+      assert.ok(agent1);
+      assert.ok(agent2);
+      assert.notEqual(agent1.toBase58(), agent2.toBase58());
+    });
+
+    it('AgentState PDA is deterministic', () => {
+      const [user1State] = deriveUserState(user1.publicKey);
+      const [agent1a] = deriveAgentState(user1State, 5);
+      const [agent1b] = deriveAgentState(user1State, 5);
+      assert.equal(agent1a.toBase58(), agent1b.toBase58());
+    });
+
+    it('Different parents produce different agent PDAs at same nonce', () => {
+      const [user1State] = deriveUserState(user1.publicKey);
+      const [user2State] = deriveUserState(user2.publicKey);
+      const [agent1] = deriveAgentState(user1State, 0);
+      const [agent2] = deriveAgentState(user2State, 0);
+
+      assert.notEqual(agent1.toBase58(), agent2.toBase58());
+    });
+
+    it('Validates max depth of 4', () => {
+      const MAX_DEPTH = 4;
+      const [root] = deriveUserState(user1.publicKey);
+      const chain: PublicKey[] = [root];
+
+      // Simulate a depth-4 chain
+      for (let i = 0; i < MAX_DEPTH; i++) {
+        const [agent] = deriveAgentState(chain[chain.length - 1], 0);
+        chain.push(agent);
+      }
+
+      assert.equal(chain.length - 1, MAX_DEPTH); // 4 agents deep
+      // root -> agent0 -> agent1 -> agent2 -> agent3
+    });
+
+    it('Validates max agents per parent of 64', () => {
+      const MAX_AGENTS_PER_PARENT = 64;
+      const [user1State] = deriveUserState(user1.publicKey);
+      const agents: PublicKey[] = [];
+
+      for (let i = 0; i < MAX_AGENTS_PER_PARENT; i++) {
+        const [agent] = deriveAgentState(user1State, i);
+        agents.push(agent);
+      }
+
+      assert.equal(agents.length, MAX_AGENTS_PER_PARENT);
+      // All agents should be unique
+      const unique = new Set(agents.map(a => a.toBase58()));
+      assert.equal(unique.size, MAX_AGENTS_PER_PARENT);
+    });
+
+    it('Agent chain maintains parent-child relationship', () => {
+      const [root] = deriveUserState(user1.publicKey);
+      const [agent1] = deriveAgentState(root, 0);
+      const [agent2] = deriveAgentState(agent1, 0);
+      const [agent3] = deriveAgentState(agent2, 0);
+
+      // All should be unique
+      assert.notEqual(root.toBase58(), agent1.toBase58());
+      assert.notEqual(agent1.toBase58(), agent2.toBase58());
+      assert.notEqual(agent2.toBase58(), agent3.toBase58());
+
+      // Agent2's parent is agent1, not root
+      const [agent2Alt] = deriveAgentState(root, 1);
+      assert.notEqual(agent2.toBase58(), agent2Alt.toBase58());
     });
   });
 

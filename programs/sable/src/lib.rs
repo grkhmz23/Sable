@@ -15,10 +15,12 @@ use ephemeral_rollups_sdk::ephem::commit_and_undelegate_accounts;
 
 pub mod error;
 pub mod events;
+pub mod instructions;
 pub mod state;
 
 use error::*;
 use events::*;
+use instructions::agent::*;
 use state::*;
 
 declare_id!("SaSAXcdWhyr1KD8TKRg6K7WPuxcPLZJHKEwsjQgL5Di");
@@ -59,6 +61,7 @@ pub mod sable {
         user_state.owner = ctx.accounts.owner.key();
         user_state.bump = ctx.bumps.user_state;
         user_state.state_version = 0;
+        user_state.agent_count = 0;
 
         emit!(JoinEvent {
             owner: user_state.owner,
@@ -91,6 +94,7 @@ pub mod sable {
         user_state.owner = ctx.accounts.owner.key();
         user_state.bump = ctx.bumps.user_state;
         user_state.state_version = 0;
+        user_state.agent_count = 0;
 
         // 2. Create wSOL UserBalance (always included by default)
         let wsol_balance = &mut ctx.accounts.wsol_balance;
@@ -550,6 +554,21 @@ pub mod sable {
         });
 
         Ok(())
+    }
+
+    /// Spawn a new agent under a UserState or existing AgentState.
+    pub fn spawn_agent(
+        ctx: Context<SpawnAgent>,
+        parent_kind: ParentKind,
+        label: String,
+        nonce: u32,
+    ) -> Result<()> {
+        instructions::agent::spawn_agent(ctx, parent_kind, label, nonce)
+    }
+
+    /// Close an agent. Only the root_user owner can close.
+    pub fn close_agent(ctx: Context<CloseAgent>) -> Result<()> {
+        instructions::agent::close_agent(ctx)
     }
 
     /// Delegate UserState and UserBalance PDAs to the Ephemeral Rollup.
@@ -1119,6 +1138,7 @@ pub struct CommitAndUndelegateUserStateAndBalances<'info> {
 // Constants
 pub const CONFIG_SEED: &str = "config";
 pub const USER_STATE_SEED: &str = "user_state";
+pub const AGENT_STATE_SEED: &str = "agent_state";
 pub const USER_BALANCE_SEED: &str = "user_balance";
 pub const VAULT_AUTHORITY_SEED: &str = "vault_authority";
 pub const MAX_BATCH_TRANSFER_RECIPIENTS: usize = 15;

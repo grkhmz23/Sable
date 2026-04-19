@@ -23,6 +23,7 @@ export const ASSOCIATED_TOKEN_PROGRAM_ID = new PublicKey(
 export const SEEDS = {
   CONFIG: Buffer.from('config'),
   USER_STATE: Buffer.from('user_state'),
+  AGENT_STATE: Buffer.from('agent_state'),
   USER_BALANCE: Buffer.from('user_balance'),
   VAULT_AUTHORITY: Buffer.from('vault_authority'),
 } as const;

@@ -84,3 +84,12 @@ pub struct CommitUndelegateEvent {
     pub mint_count: u8,
     pub mints: Vec<Pubkey>,
 }
+
+#[event]
+pub struct AgentSpawned {
+    pub agent: Pubkey,
+    pub parent: Pubkey,
+    pub root_user: Pubkey,
+    pub label: [u8; 32],
+    pub owner: Pubkey,
+}

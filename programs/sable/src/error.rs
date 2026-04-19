@@ -73,4 +73,22 @@ pub enum SableError {
 
     #[msg("Too many balances for delegation")]
     TooManyBalancesForDelegation,
+
+    #[msg("Agent depth exceeded maximum allowed")]
+    AgentDepthExceeded,
+
+    #[msg("Agent has children and cannot be closed")]
+    AgentHasChildren,
+
+    #[msg("Not the root user owner")]
+    NotAgentRoot,
+
+    #[msg("Agent is frozen or revoked")]
+    AgentFrozenOrRevoked,
+
+    #[msg("Invalid ancestor chain")]
+    InvalidAncestorChain,
+
+    #[msg("Too many agents for this parent")]
+    TooManyAgents,
 }
