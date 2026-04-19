@@ -1,13 +1,13 @@
 {
-  "name": "l2conceptv1",
+  "name": "sable",
   "version": "1.0.0",
-  "description": "L2 Concept V1 - Vault + Ledger PDAs with MagicBlock Ephemeral Rollup",
+  "description": "Sable — private programmable money for AI agents on Solana, built on MagicBlock ER + PER + Private Payments API",
   "private": true,
   "scripts": {
     "install:all": "pnpm install",
-    "anchor:build": "cd programs/l2conceptv1 && cargo build-sbf",
-    "anchor:test": "cd programs/l2conceptv1 && anchor test",
-    "anchor:deploy:devnet": "cd programs/l2conceptv1 && anchor deploy --provider.cluster devnet",
+    "anchor:build": "cd programs/sable && cargo build-sbf",
+    "anchor:test": "cd programs/sable && anchor test",
+    "anchor:deploy:devnet": "cd programs/sable && anchor deploy --provider.cluster devnet",
     "app:dev": "cd app && pnpm dev",
     "app:build": "cd app && pnpm build",
     "app:lint": "cd app && pnpm lint",

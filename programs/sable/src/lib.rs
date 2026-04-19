@@ -17,10 +17,10 @@ pub mod state;
 
 use error::*;
 use events::*;
-use magicblock::{DelegationParams, log_delegate_request, log_commit_undelegate_request};
 use state::*;
 
-declare_id!("L2CnccKT1qHNS1wJ7p3wJ3JhCX5s4J5wT5x3h5mH2j1");
+// NOTE: SABLE_PROGRAM_ID_TBD — replace with real deployed program ID in Prompt 3
+declare_id!("CvGdTmYZXMSibPL49xCzvghYDk156EfUVbkrd9P6devK");
 
 // Default MagicBlock delegation program ID (mainnet)
 pub const DEFAULT_DELEGATION_PROGRAM_ID: Pubkey =
@@ -30,7 +30,7 @@ pub const DEFAULT_DELEGATION_PROGRAM_ID: Pubkey =
 pub const WSOL_MINT: Pubkey = pubkey!("So11111111111111111111111111111111111111112");
 
 #[program]
-pub mod l2conceptv1 {
+pub mod sable {
     use super::*;
 
     /// Initialize the program config and vault authority
@@ -78,14 +78,14 @@ pub mod l2conceptv1 {
         // Validate mint count
         require!(
             additional_mints.len() <= MAX_MINTS_PER_SETUP,
-            L2ConceptV1Error::TooManyMints
+            SableError::TooManyMints
         );
 
         // Check for duplicates (including wSOL)
         let mut mint_set = std::collections::HashSet::new();
         for mint in &additional_mints {
-            require!(*mint != WSOL_MINT, L2ConceptV1Error::DuplicateMint);
-            require!(mint_set.insert(*mint), L2ConceptV1Error::DuplicateMint);
+            require!(*mint != WSOL_MINT, SableError::DuplicateMint);
+            require!(mint_set.insert(*mint), SableError::DuplicateMint);
         }
 
         // 1. Create UserState
@@ -112,19 +112,19 @@ pub mod l2conceptv1 {
 
         require!(
             remaining.len() == n * 2,
-            L2ConceptV1Error::InvalidRecipientAccounts
+            SableError::InvalidRecipientAccounts
         );
 
         for (i, mint_key) in additional_mints.iter().enumerate() {
             // Validate mint account
             let mint_acc = &remaining[i];
-            require!(mint_acc.key() == *mint_key, L2ConceptV1Error::InvalidMint);
-            require!(mint_acc.owner == &token::ID, L2ConceptV1Error::InvalidMint);
+            require!(mint_acc.key() == *mint_key, SableError::InvalidMint);
+            require!(mint_acc.owner == &token::ID, SableError::InvalidMint);
 
             let mint_data = mint_acc.try_borrow_data()?;
             require!(
                 mint_data.len() >= 82 && mint_data[0] == 1,
-                L2ConceptV1Error::InvalidMint
+                SableError::InvalidMint
             );
             drop(mint_data);
 
@@ -141,7 +141,7 @@ pub mod l2conceptv1 {
                 Pubkey::find_program_address(expected_seeds, ctx.program_id);
             require!(
                 balance_acc.key() == expected_pda,
-                L2ConceptV1Error::InvalidRecipientAccounts
+                SableError::InvalidRecipientAccounts
             );
 
             // Manually initialize the account data
@@ -178,10 +178,10 @@ pub mod l2conceptv1 {
         let mint_data = mint_info.try_borrow_data()?;
         require!(
             mint_data.len() >= 82, // Minimum mint account size
-            L2ConceptV1Error::InvalidMint
+            SableError::InvalidMint
         );
         // Check is_initialized byte (first byte)
-        require!(mint_data[0] == 1, L2ConceptV1Error::InvalidMint);
+        require!(mint_data[0] == 1, SableError::InvalidMint);
         drop(mint_data);
 
         let user_balance = &mut ctx.accounts.user_balance;
@@ -201,7 +201,7 @@ pub mod l2conceptv1 {
 
     /// Deposit tokens into the vault and credit the user's ledger
     pub fn deposit(ctx: Context<Deposit>, amount: u64) -> Result<()> {
-        require!(amount > 0, L2ConceptV1Error::InvalidAmount);
+        require!(amount > 0, SableError::InvalidAmount);
 
         // Transfer tokens from user to vault
         let cpi_accounts = Transfer {
@@ -220,11 +220,11 @@ pub mod l2conceptv1 {
         user_balance.amount = user_balance
             .amount
             .checked_add(amount)
-            .ok_or(L2ConceptV1Error::Overflow)?;
+            .ok_or(SableError::Overflow)?;
         user_state.state_version = user_state
             .state_version
             .checked_add(1)
-            .ok_or(L2ConceptV1Error::Overflow)?;
+            .ok_or(SableError::Overflow)?;
         user_balance.version = user_state.state_version;
 
         emit!(DepositEvent {
@@ -240,10 +240,10 @@ pub mod l2conceptv1 {
 
     /// Transfer tokens internally via ledger updates (batch)
     pub fn transfer_batch(ctx: Context<TransferBatch>, items: Vec<TransferItem>) -> Result<()> {
-        require!(!items.is_empty(), L2ConceptV1Error::InvalidAmount);
+        require!(!items.is_empty(), SableError::InvalidAmount);
         require!(
             items.len() <= MAX_BATCH_TRANSFER_RECIPIENTS,
-            L2ConceptV1Error::TooManyRecipients
+            SableError::TooManyRecipients
         );
 
         let sender_user_state = &mut ctx.accounts.sender_user_state;
@@ -254,33 +254,33 @@ pub mod l2conceptv1 {
         let mut recipient_map: std::collections::HashSet<Pubkey> = std::collections::HashSet::new();
 
         for item in &items {
-            require!(item.amount > 0, L2ConceptV1Error::InvalidAmount);
+            require!(item.amount > 0, SableError::InvalidAmount);
             require!(
                 item.to_owner != sender_user_state.owner,
-                L2ConceptV1Error::SelfTransferNotAllowed
+                SableError::SelfTransferNotAllowed
             );
 
             // Check for duplicate recipients
             require!(
                 recipient_map.insert(item.to_owner),
-                L2ConceptV1Error::DuplicateRecipient
+                SableError::DuplicateRecipient
             );
 
             total_debit = total_debit
                 .checked_add(item.amount)
-                .ok_or(L2ConceptV1Error::Overflow)?;
+                .ok_or(SableError::Overflow)?;
         }
 
         require!(
             sender_balance.amount >= total_debit,
-            L2ConceptV1Error::InsufficientBalance
+            SableError::InsufficientBalance
         );
 
         // Debit sender
         sender_balance.amount = sender_balance
             .amount
             .checked_sub(total_debit)
-            .ok_or(L2ConceptV1Error::Underflow)?;
+            .ok_or(SableError::Underflow)?;
 
         // Credit recipients from remaining accounts
         let remaining_accounts = ctx.remaining_accounts;
@@ -288,7 +288,7 @@ pub mod l2conceptv1 {
 
         require!(
             remaining_accounts.len() == items.len() * expected_accounts_per_recipient,
-            L2ConceptV1Error::InvalidRecipientAccounts
+            SableError::InvalidRecipientAccounts
         );
 
         let mut transfer_events = Vec::new();
@@ -303,7 +303,7 @@ pub mod l2conceptv1 {
                 Pubkey::find_program_address(expected_user_state_seeds, ctx.program_id);
             require!(
                 recipient_user_state_info.key() == expected_user_state,
-                L2ConceptV1Error::InvalidRecipientAccounts
+                SableError::InvalidRecipientAccounts
             );
 
             // Validate recipient UserBalance PDA
@@ -316,7 +316,7 @@ pub mod l2conceptv1 {
                 Pubkey::find_program_address(expected_balance_seeds, ctx.program_id);
             require!(
                 recipient_balance_info.key() == expected_balance,
-                L2ConceptV1Error::InvalidRecipientAccounts
+                SableError::InvalidRecipientAccounts
             );
 
             // Credit recipient using direct account data manipulation
@@ -336,14 +336,14 @@ pub mod l2conceptv1 {
             ]);
             let new_amount = current_amount
                 .checked_add(item.amount)
-                .ok_or(L2ConceptV1Error::Overflow)?;
+                .ok_or(SableError::Overflow)?;
             recipient_balance_data[73..81].copy_from_slice(&new_amount.to_le_bytes());
 
             // Update version
             let new_version = sender_user_state
                 .state_version
                 .checked_add(1)
-                .ok_or(L2ConceptV1Error::Overflow)?;
+                .ok_or(SableError::Overflow)?;
             recipient_balance_data[81..89].copy_from_slice(&new_version.to_le_bytes());
 
             transfer_events.push(TransferEvent {
@@ -358,7 +358,7 @@ pub mod l2conceptv1 {
         sender_user_state.state_version = sender_user_state
             .state_version
             .checked_add(1)
-            .ok_or(L2ConceptV1Error::Overflow)?;
+            .ok_or(SableError::Overflow)?;
         sender_balance.version = sender_user_state.state_version;
 
         emit!(TransferBatchEvent {
@@ -379,16 +379,16 @@ pub mod l2conceptv1 {
         ctx: Context<'_, '_, '_, 'info, ExternalSendBatch<'info>>,
         items: Vec<TransferItem>,
     ) -> Result<()> {
-        require!(!items.is_empty(), L2ConceptV1Error::InvalidAmount);
+        require!(!items.is_empty(), SableError::InvalidAmount);
         require!(
             items.len() <= MAX_BATCH_TRANSFER_RECIPIENTS,
-            L2ConceptV1Error::TooManyRecipients
+            SableError::TooManyRecipients
         );
 
         let sender_user_state_info = ctx.accounts.sender_user_state.to_account_info();
         require!(
             sender_user_state_info.owner == ctx.program_id,
-            L2ConceptV1Error::WithdrawWhileDelegated
+            SableError::WithdrawWhileDelegated
         );
 
         let vault_ata_info = ctx.accounts.vault_ata.to_account_info();
@@ -401,28 +401,28 @@ pub mod l2conceptv1 {
         // Validate total debit
         let mut total_debit: u64 = 0;
         for item in &items {
-            require!(item.amount > 0, L2ConceptV1Error::InvalidAmount);
+            require!(item.amount > 0, SableError::InvalidAmount);
             total_debit = total_debit
                 .checked_add(item.amount)
-                .ok_or(L2ConceptV1Error::Overflow)?;
+                .ok_or(SableError::Overflow)?;
         }
 
         require!(
             sender_balance.amount >= total_debit,
-            L2ConceptV1Error::InsufficientBalance
+            SableError::InsufficientBalance
         );
 
         let remaining_accounts = ctx.remaining_accounts;
         require!(
             remaining_accounts.len() == items.len(),
-            L2ConceptV1Error::InvalidRecipientAccounts
+            SableError::InvalidRecipientAccounts
         );
 
         // Debit sender before credits. Transaction atomicity guarantees rollback on failure.
         sender_balance.amount = sender_balance
             .amount
             .checked_sub(total_debit)
-            .ok_or(L2ConceptV1Error::Underflow)?;
+            .ok_or(SableError::Underflow)?;
 
         let vault_authority_seeds = &[
             VAULT_AUTHORITY_SEED.as_bytes(),
@@ -439,23 +439,23 @@ pub mod l2conceptv1 {
 
             require!(
                 destination_ata_info.owner == &token::ID,
-                L2ConceptV1Error::InvalidDestinationTokenAccount
+                SableError::InvalidDestinationTokenAccount
             );
             require!(
                 destination_ata_info.key() != vault_ata_key,
-                L2ConceptV1Error::InvalidDestinationTokenAccount
+                SableError::InvalidDestinationTokenAccount
             );
 
             let dest_data = destination_ata_info.try_borrow_data()?;
             let dest_token = spl_token::state::Account::unpack(&dest_data)
-                .map_err(|_| error!(L2ConceptV1Error::InvalidDestinationTokenAccount))?;
+                .map_err(|_| error!(SableError::InvalidDestinationTokenAccount))?;
             require!(
                 dest_token.mint == mint_key,
-                L2ConceptV1Error::InvalidDestinationTokenAccount
+                SableError::InvalidDestinationTokenAccount
             );
             require!(
                 dest_token.owner == item.to_owner,
-                L2ConceptV1Error::InvalidDestinationTokenAccount
+                SableError::InvalidDestinationTokenAccount
             );
             drop(dest_data);
 
@@ -479,7 +479,7 @@ pub mod l2conceptv1 {
         sender_user_state.state_version = sender_user_state
             .state_version
             .checked_add(1)
-            .ok_or(L2ConceptV1Error::Overflow)?;
+            .ok_or(SableError::Overflow)?;
         sender_balance.version = sender_user_state.state_version;
 
         emit!(ExternalSendBatchEvent {
@@ -496,7 +496,7 @@ pub mod l2conceptv1 {
 
     /// Withdraw tokens from vault (only when not delegated)
     pub fn withdraw(ctx: Context<Withdraw>, amount: u64) -> Result<()> {
-        require!(amount > 0, L2ConceptV1Error::InvalidAmount);
+        require!(amount > 0, SableError::InvalidAmount);
 
         let user_state = &ctx.accounts.user_state;
         let user_balance = &mut ctx.accounts.user_balance;
@@ -505,12 +505,12 @@ pub mod l2conceptv1 {
         let user_state_info = user_state.to_account_info();
         require!(
             user_state_info.owner == ctx.program_id,
-            L2ConceptV1Error::WithdrawWhileDelegated
+            SableError::WithdrawWhileDelegated
         );
 
         require!(
             user_balance.amount >= amount,
-            L2ConceptV1Error::InsufficientBalance
+            SableError::InsufficientBalance
         );
 
         // Get vault authority seeds
@@ -534,13 +534,13 @@ pub mod l2conceptv1 {
         user_balance.amount = user_balance
             .amount
             .checked_sub(amount)
-            .ok_or(L2ConceptV1Error::Underflow)?;
+            .ok_or(SableError::Underflow)?;
 
         let user_state = &mut ctx.accounts.user_state;
         user_state.state_version = user_state
             .state_version
             .checked_add(1)
-            .ok_or(L2ConceptV1Error::Overflow)?;
+            .ok_or(SableError::Overflow)?;
         user_balance.version = user_state.state_version;
 
         emit!(WithdrawEvent {
@@ -555,76 +555,21 @@ pub mod l2conceptv1 {
     }
 
     /// Request delegation to MagicBlock Ephemeral Rollup
-    /// Emits events for MagicBlock indexer; full CPI requires compatible SDK
+    /// Real CPI will be wired in Prompt 2.
     pub fn delegate_user_state_and_balances(
-        ctx: Context<DelegateUserStateAndBalances>,
-        mint_list: Vec<Pubkey>,
+        _ctx: Context<DelegateUserStateAndBalances>,
+        _mint_list: Vec<Pubkey>,
     ) -> Result<()> {
-        require!(!mint_list.is_empty(), L2ConceptV1Error::EmptyMintList);
-        require!(
-            mint_list.len() <= MAX_MINTS_PER_DELEGATION,
-            L2ConceptV1Error::InvalidMintList
-        );
-
-        let mut accounts_to_delegate = vec![ctx.accounts.user_state.key()];
-
-        // Add user balance accounts for each mint
-        for mint in &mint_list {
-            let balance_pda = Pubkey::find_program_address(
-                &[b"user_balance", ctx.accounts.owner.key().as_ref(), mint.as_ref()],
-                &ID,
-            )
-            .0;
-            accounts_to_delegate.push(balance_pda);
-        }
-
-        // Log delegation request (MagicBlock indexer can process this)
-        let params = DelegationParams::default();
-        log_delegate_request(ctx.accounts.owner.key(), accounts_to_delegate, params);
-
-        emit!(DelegateEvent {
-            owner: ctx.accounts.owner.key(),
-            mint_count: mint_list.len() as u8,
-            mints: mint_list,
-        });
-
-        Ok(())
+        Err(SableError::NotYetImplemented.into())
     }
 
     /// Request commit and undelegate from MagicBlock ER
-    /// Emits events for MagicBlock indexer; full CPI requires compatible SDK
+    /// Real CPI will be wired in Prompt 2.
     pub fn commit_and_undelegate_user_state_and_balances(
-        ctx: Context<CommitAndUndelegateUserStateAndBalances>,
-        mint_list: Vec<Pubkey>,
+        _ctx: Context<CommitAndUndelegateUserStateAndBalances>,
+        _mint_list: Vec<Pubkey>,
     ) -> Result<()> {
-        require!(!mint_list.is_empty(), L2ConceptV1Error::EmptyMintList);
-        require!(
-            mint_list.len() <= MAX_MINTS_PER_DELEGATION,
-            L2ConceptV1Error::InvalidMintList
-        );
-
-        let mut accounts_to_commit = vec![ctx.accounts.user_state.key()];
-
-        // Add user balance accounts for each mint
-        for mint in &mint_list {
-            let balance_pda = Pubkey::find_program_address(
-                &[b"user_balance", ctx.accounts.owner.key().as_ref(), mint.as_ref()],
-                &ID,
-            )
-            .0;
-            accounts_to_commit.push(balance_pda);
-        }
-
-        // Log commit/undelegate request
-        log_commit_undelegate_request(ctx.accounts.owner.key(), accounts_to_commit);
-
-        emit!(CommitUndelegateEvent {
-            owner: ctx.accounts.owner.key(),
-            mint_count: mint_list.len() as u8,
-            mints: mint_list,
-        });
-
-        Ok(())
+        Err(SableError::NotYetImplemented.into())
     }
 }
 
@@ -802,7 +747,7 @@ pub struct TransferBatch<'info> {
         mut,
         seeds = [USER_STATE_SEED.as_bytes(), sender.key().as_ref()],
         bump = sender_user_state.bump,
-        has_one = owner @ L2ConceptV1Error::NotAuthorized,
+        has_one = owner @ SableError::NotAuthorized,
     )]
     pub sender_user_state: Account<'info, UserState>,
 
@@ -814,7 +759,7 @@ pub struct TransferBatch<'info> {
             mint.key().as_ref()
         ],
         bump = sender_balance.bump,
-        has_one = owner @ L2ConceptV1Error::NotAuthorized,
+        has_one = owner @ SableError::NotAuthorized,
         has_one = mint,
     )]
     pub sender_balance: Account<'info, UserBalance>,

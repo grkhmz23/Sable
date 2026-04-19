@@ -55,7 +55,7 @@ jobs:
       - name: Cache Rust dependencies
         uses: Swatinem/rust-cache@v2
         with:
-          workspaces: programs/l2conceptv1
+          workspaces: programs/sable
 
       - name: Install Solana CLI
         run: |
@@ -64,22 +64,22 @@ jobs:
 
       - name: Check Rust formatting
         run: |
-          cd programs/l2conceptv1
+          cd programs/sable
           cargo fmt -- --check
 
       - name: Run Rust clippy
         run: |
-          cd programs/l2conceptv1
+          cd programs/sable
           cargo clippy -- -D warnings
 
       - name: Build Anchor program (SBF)
         run: |
-          cd programs/l2conceptv1
+          cd programs/sable
           cargo build-sbf
 
       - name: Verify .so artifact exists
         run: |
-          ls -la programs/l2conceptv1/target/deploy/l2conceptv1.so
+          ls -la programs/sable/target/deploy/sable.so
 
       - name: Build packages
         run: pnpm build:all
@@ -91,7 +91,7 @@ jobs:
         run: pnpm app:build
         env:
           NEXT_PUBLIC_SOLANA_RPC_URL: http://127.0.0.1:8899
-          NEXT_PUBLIC_L2CONCEPTV1_PROGRAM_ID: L2CnccKT1qHNS1wJ7p3wJ3JhCX5s4J5wT5x3h5mH2j1
+          NEXT_PUBLIC_SABLE_PROGRAM_ID: SABLE_PROGRAM_ID_TBD
 
   scan-placeholders:
     runs-on: ubuntu-latest

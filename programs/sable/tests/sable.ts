@@ -25,7 +25,7 @@ import { assert } from 'chai';
 // IDL placeholder - will be replaced when IDL is generated
 const IDL = {
   version: '1.0.0',
-  name: 'l2conceptv1',
+  name: 'sable',
   instructions: [
     { name: 'initialize', accounts: [], args: [] },
     { name: 'join', accounts: [], args: [] },
@@ -63,7 +63,7 @@ const IDL = {
   ],
 };
 
-describe('l2conceptv1', () => {
+describe('sable', () => {
   // Configure the client to use the local cluster
   const provider = anchor.AnchorProvider.env();
   anchor.setProvider(provider);
@@ -75,7 +75,7 @@ describe('l2conceptv1', () => {
   const user3 = Keypair.generate();
 
   // Program ID (using a dummy one for tests)
-  const programId = new PublicKey('L2CnccKT1qHNS1wJ7p3wJ3JhCX5s4J5wT5x3h5mH2j1');
+  const programId = new PublicKey('SABLE_PROGRAM_ID_TBD');
 
   // PDAs
   let configPda: PublicKey;

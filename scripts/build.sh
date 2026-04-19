@@ -1,11 +1,11 @@
 #!/bin/bash
 set -e
 
-echo "Building L2Concept V1..."
+echo "Building Sable..."
 
 # Build Anchor program
 echo "Building Anchor program..."
-cd programs/l2conceptv1
+cd programs/sable
 anchor build
 cd ../..
 

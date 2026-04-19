@@ -44,10 +44,10 @@ export const RPC_ENDPOINTS = {
 export function getProgramId(): PublicKey {
   const envProgramId = 
     typeof process !== 'undefined' ? 
-    (process.env.REACT_APP_L2CONCEPTV1_PROGRAM_ID || 
-     process.env.NEXT_PUBLIC_L2CONCEPTV1_PROGRAM_ID) : 
+    (process.env.REACT_APP_SABLE_PROGRAM_ID || 
+     process.env.NEXT_PUBLIC_SABLE_PROGRAM_ID) : 
     undefined;
   
-  const programIdStr = envProgramId || 'L2CnccKT1qHNS1wJ7p3wJ3JhCX5s4J5wT5x3h5mH2j1';
+  const programIdStr = envProgramId || 'SABLE_PROGRAM_ID_TBD';
   return new PublicKey(programIdStr);
 }

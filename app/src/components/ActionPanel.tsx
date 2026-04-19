@@ -5,7 +5,7 @@ import { useWalletContext } from '@/contexts/WalletContext';
 import { PublicKey } from '@solana/web3.js';
 import { BN } from '@coral-xyz/anchor';
 import { useWallet } from '@solana/wallet-adapter-react';
-import type { TransferItem as SdkTransferItem } from '@l2conceptv1/sdk';
+import type { TransferItem as SdkTransferItem } from '@sable/sdk';
 import { DelegationStatusComponent } from '@/components/DelegationStatus';
 import {
   GlassPanel,
@@ -330,8 +330,6 @@ function SendForm() {
             <Pill tone={routingMode === 'er' ? 'amber' : 'default'}>
               {routingMode === 'er'
                 ? 'MagicBlock ER'
-                : routingMode === 'router'
-                ? 'Router (UI placeholder)'
                 : 'Solana L1'}
             </Pill>
           </div>

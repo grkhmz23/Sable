@@ -7,10 +7,10 @@ seeds = false
 skip-lint = false
 
 [programs.localnet]
-l2conceptv1 = "L2CnccKT1qHNS1wJ7p3wJ3JhCX5s4J5wT5x3h5mH2j1"
+sable = "SABLE_PROGRAM_ID_TBD"
 
 [programs.devnet]
-l2conceptv1 = "L2CnccKT1qHNS1wJ7p3wJ3JhCX5s4J5wT5x3h5mH2j1"
+sable = "SABLE_PROGRAM_ID_TBD"
 
 [registry]
 url = "https://api.apr.dev"

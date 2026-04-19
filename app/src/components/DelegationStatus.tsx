@@ -2,11 +2,11 @@
 
 import { useEffect, useMemo, useState } from 'react';
 import { PublicKey } from '@solana/web3.js';
-import { L2ConceptSdk, DelegationStatus } from '@l2conceptv1/sdk';
+import { SableSdk, DelegationStatus } from '@sable/sdk';
 import { GlassPanel, LuxuryButton, Pill, truncateAddress, cn } from '@/components/ui/luxury';
 
 interface DelegationStatusProps {
-  sdk: L2ConceptSdk | null;
+  sdk: SableSdk | null;
   owner: PublicKey | null;
   mints: PublicKey[];
   refreshInterval?: number;

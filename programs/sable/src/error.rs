@@ -1,7 +1,7 @@
 use anchor_lang::prelude::*;
 
 #[error_code]
-pub enum L2ConceptV1Error {
+pub enum SableError {
     #[msg("Program not initialized")]
     NotInitialized,
 
@@ -64,4 +64,7 @@ pub enum L2ConceptV1Error {
 
     #[msg("Invalid destination token account")]
     InvalidDestinationTokenAccount,
+
+    #[msg("Not yet implemented")]
+    NotYetImplemented,
 }

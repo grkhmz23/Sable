@@ -1,6 +1,6 @@
 {
   "version": "1.0.0",
-  "name": "l2conceptv1",
+  "name": "sable",
   "instructions": [
     {
       "name": "initialize",
@@ -251,6 +251,6 @@
     { "code": 6016, "name": "NotDelegated", "msg": "Account is not delegated" }
   ],
   "metadata": {
-    "address": "L2CnccKT1qHNS1wJ7p3wJ3JhCX5s4J5wT5x3h5mH2j1"
+    "address": "SABLE_PROGRAM_ID_TBD"
   }
 }

@@ -3,7 +3,7 @@
 import { useState, useEffect, useCallback } from 'react';
 import { useWalletContext } from '@/contexts/WalletContext';
 import { useWallet } from '@solana/wallet-adapter-react';
-import { WSOL_MINT } from '@l2conceptv1/sdk';
+import { WSOL_MINT } from '@sable/sdk';
 import { CompleteSetupModal } from './CompleteSetupModal';
 import {
   GlassPanel,
@@ -313,7 +313,7 @@ function SetupOverlay({
           </h2>
           <p className="mt-4 text-sm leading-relaxed text-zinc-400">
             {notJoined
-              ? 'Create your UserState PDA and initialize your L2Concept wallet identity. wSOL is treated as the default base asset and can be created during complete setup.'
+              ? 'Create your UserState PDA and initialize your Sable wallet identity. wSOL is treated as the default base asset and can be created during complete setup.'
               : 'Your wallet identity exists, but the default wSOL balance PDA is still missing. Complete setup to enable the standard vault + ledger workflow.'}
           </p>
         </div>

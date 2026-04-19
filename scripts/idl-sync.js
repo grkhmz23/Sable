@@ -10,7 +10,7 @@ const fs = require('fs');
 const path = require('path');
 
 const ROOT_DIR = path.resolve(__dirname, '..');
-const IDL_SOURCE = path.join(ROOT_DIR, 'programs', 'l2conceptv1', 'target', 'idl', 'l2conceptv1.json');
+const IDL_SOURCE = path.join(ROOT_DIR, 'programs/sable/target', 'idl', 'sable.json');
 const SDK_IDL_DIR = path.join(ROOT_DIR, 'packages', 'sdk', 'idl');
 const APP_IDL_DIR = path.join(ROOT_DIR, 'app', 'src', 'idl');
 
@@ -38,10 +38,10 @@ function main() {
   
   try {
     // Copy to SDK
-    copyIdl(IDL_SOURCE, path.join(SDK_IDL_DIR, 'l2conceptv1.json'));
+    copyIdl(IDL_SOURCE, path.join(SDK_IDL_DIR, 'sable.json'));
     
     // Copy to App
-    copyIdl(IDL_SOURCE, path.join(APP_IDL_DIR, 'l2conceptv1.json'));
+    copyIdl(IDL_SOURCE, path.join(APP_IDL_DIR, 'sable.json'));
     
     console.log('IDL sync complete!');
   } catch (error) {

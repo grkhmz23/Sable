@@ -1,10 +1,10 @@
-# L2Concept V1
+# Sable
 
 A production-grade Solana program implementing a vault + per-user-per-mint ledger system with MagicBlock Ephemeral Rollup integration.
 
 ## Overview
 
-L2Concept V1 provides a wallet-like experience where:
+Sable provides a wallet-like experience where:
 - **Real tokens** live in a program-controlled vault (Vault ATA per mint)
 - **User balances** are tracked in PDAs (ledger accounts), NOT by moving SPL tokens for internal transfers
 - **Internal transfers** update ledger balances atomically
@@ -14,7 +14,7 @@ L2Concept V1 provides a wallet-like experience where:
 
 ```
 ┌─────────────────────────────────────────────────────────────────┐
-│                         L2Concept V1                             │
+│                         Sable                             │
 ├─────────────────────────────────────────────────────────────────┤
 │  ┌─────────────┐  ┌─────────────┐  ┌─────────────────────────┐  │
 │  │   Config    │  │  UserState  │  │      UserBalance        │  │
@@ -104,7 +104,7 @@ The app will be available at `http://localhost:3000`.
 
 ## Program ID
 
-**Devnet/Mainnet**: `L2CnccKT1qHNS1wJ7p3wJ3JhCX5s4J5wT5x3h5mH2j1`
+**Devnet/Mainnet**: `SABLE_PROGRAM_ID_TBD`
 
 ## MagicBlock Integration Details
 
@@ -153,10 +153,10 @@ const hasDelegated = await sdk.hasDelegatedAccounts(owner, mintList);
 ### Complete Setup (wSOL + Additional Mints)
 
 ```typescript
-import { L2ConceptSdk, WSOL_MINT } from '@l2conceptv1/sdk';
+import { SableSdk, WSOL_MINT } from '@sable/sdk';
 
-const sdk = new L2ConceptSdk({
-  programId: new PublicKey('L2CnccKT1qHNS1wJ7p3wJ3JhCX5s4J5wT5x3h5mH2j1'),
+const sdk = new SableSdk({
+  programId: new PublicKey('SABLE_PROGRAM_ID_TBD'),
   connection,
   wallet,
 });
@@ -228,7 +228,7 @@ await sdk.commitAndUndelegate({
 
 ```
 .
-├── programs/l2conceptv1/    # Anchor program
+├── programs/sable/    # Anchor program
 │   ├── src/
 │   │   ├── lib.rs           # Main program
 │   │   ├── error.rs         # Error codes
@@ -248,7 +248,7 @@ await sdk.commitAndUndelegate({
 
 ```bash
 # Build program
-cd programs/l2conceptv1 && cargo build-sbf
+cd programs/sable && cargo build-sbf
 
 # Build SDK
 pnpm -r build

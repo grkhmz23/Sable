@@ -42,7 +42,7 @@ function DisconnectedHero() {
     <div className="mt-6 grid flex-1 items-start gap-6 lg:grid-cols-12">
       <GlassPanel className="p-8 lg:col-span-7 lg:p-10" highlight>
         <p className="text-[10px] uppercase tracking-[0.3em] text-amber-200/70">
-          L2Concept V1
+          Sable
         </p>
         <h2 className="mt-4 text-4xl leading-tight text-white md:text-5xl">
           Vault + Ledger Wallet

@@ -1,11 +1,11 @@
 [package]
-name = "l2conceptv1"
+name = "sable"
 version = "1.0.0"
 edition = "2021"
 
 [lib]
 crate-type = ["cdylib", "lib"]
-name = "l2conceptv1"
+name = "sable"
 
 [features]
 default = []

@@ -17,17 +17,17 @@ import {
   WalletMultiButton,
 } from '@solana/wallet-adapter-react-ui';
 import { Connection, PublicKey } from '@solana/web3.js';
-import { L2ConceptSdk } from '@l2conceptv1/sdk';
+import { SableSdk } from '@sable/sdk';
 import { env } from '@/utils/env';
 
 // Import wallet adapter CSS
 import '@solana/wallet-adapter-react-ui/styles.css';
 
-export type RoutingMode = 'router' | 'solana' | 'er';
+export type RoutingMode = 'solana' | 'er';
 
 interface WalletContextValue {
-  sdk: L2ConceptSdk | null;
-  solanaSdk: L2ConceptSdk | null;
+  sdk: SableSdk | null;
+  solanaSdk: SableSdk | null;
   connection: Connection;
   solanaConnection: Connection;
   routingMode: RoutingMode;
@@ -62,9 +62,6 @@ const WalletContextInner: FC<{ children: ReactNode }> = ({ children }) => {
           return baseConnection;
         }
         return new Connection(env.MAGICBLOCK_RPC_URL, 'confirmed');
-      case 'router':
-        // Router mode would use a custom fetch implementation
-        return baseConnection;
       case 'solana':
       default:
         return baseConnection;
@@ -75,8 +72,8 @@ const WalletContextInner: FC<{ children: ReactNode }> = ({ children }) => {
   const sdk = useMemo(() => {
     if (!wallet.publicKey || !wallet.signTransaction) return null;
 
-    return new L2ConceptSdk({
-      programId: new PublicKey(env.L2CONCEPTV1_PROGRAM_ID),
+    return new SableSdk({
+      programId: new PublicKey(env.SABLE_PROGRAM_ID),
       connection,
       wallet: {
         publicKey: wallet.publicKey,
@@ -90,8 +87,8 @@ const WalletContextInner: FC<{ children: ReactNode }> = ({ children }) => {
   const solanaSdk = useMemo(() => {
     if (!wallet.publicKey || !wallet.signTransaction) return null;
 
-    return new L2ConceptSdk({
-      programId: new PublicKey(env.L2CONCEPTV1_PROGRAM_ID),
+    return new SableSdk({
+      programId: new PublicKey(env.SABLE_PROGRAM_ID),
       connection: baseConnection,
       wallet: {
         publicKey: wallet.publicKey,

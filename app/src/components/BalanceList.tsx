@@ -4,7 +4,7 @@ import { useState, useEffect, useCallback } from 'react';
 import { useWalletContext } from '@/contexts/WalletContext';
 import { useWallet } from '@solana/wallet-adapter-react';
 import { PublicKey } from '@solana/web3.js';
-import { WSOL_MINT } from '@l2conceptv1/sdk';
+import { WSOL_MINT } from '@sable/sdk';
 import {
   GlassPanel,
   LuxuryButton,

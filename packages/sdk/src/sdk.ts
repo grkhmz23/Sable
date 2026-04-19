@@ -33,7 +33,7 @@ import {
 } from './types';
 
 // IDL type (minimal structure for SDK)
-export type L2conceptv1 = any;
+export type SableProgram = any;
 
 // Default MagicBlock delegation program
 const DEFAULT_DELEGATION_PROGRAM = new PublicKey(
@@ -43,8 +43,8 @@ const DEFAULT_DELEGATION_PROGRAM = new PublicKey(
 // wSOL mint address - always included by default
 export const WSOL_MINT = new PublicKey('So11111111111111111111111111111111111111112');
 
-export class L2ConceptSdk {
-  program: Program<L2conceptv1>;
+export class SableSdk {
+  program: Program<SableProgram>;
   provider: AnchorProvider;
   pda: PdaHelper;
   config: SdkConfig;
@@ -70,7 +70,7 @@ export class L2ConceptSdk {
   private createMinimalIdl(): any {
     return {
       version: '1.0.0',
-      name: 'l2conceptv1',
+      name: 'sable',
       instructions: [
         {
           name: 'initialize',

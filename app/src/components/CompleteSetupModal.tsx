@@ -3,7 +3,7 @@
 import { useMemo, useState } from 'react';
 import { useWalletContext } from '@/contexts/WalletContext';
 import { PublicKey } from '@solana/web3.js';
-import { WSOL_MINT } from '@l2conceptv1/sdk';
+import { WSOL_MINT } from '@sable/sdk';
 import {
   GlassPanel,
   LuxuryButton,
@@ -136,13 +136,13 @@ export function CompleteSetupModal({
         <div className="flex items-start justify-between gap-4">
           <div>
             <p className="text-[10px] uppercase tracking-[0.3em] text-amber-200/70">
-              Complete Setup
+              Create Treasury
             </p>
             <h3 className="mt-2 text-2xl text-white md:text-3xl">
               Initialize Balance PDAs
             </h3>
             <p className="mt-3 text-sm text-zinc-400">
-              wSOL is always included. Add up to 9 extra mint addresses to create balance PDAs in the same setup flow.
+              wSOL is always included. Add up to 9 extra mint addresses to create balance PDAs in the same setup flow. Your balances are private when delegated to PER.
             </p>
           </div>
           <LuxuryButton variant="ghost" className="px-3 py-2" onClick={onClose}>

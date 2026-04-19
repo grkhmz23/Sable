@@ -7,7 +7,6 @@ import { useWallet } from '@solana/wallet-adapter-react';
 const ROUTES = [
   { id: 'solana', label: 'Solana L1' },
   { id: 'er', label: 'MagicBlock ER' },
-  { id: 'router', label: 'Magic Router' },
 ] as const;
 
 export function WalletConnect() {
@@ -21,12 +20,12 @@ export function WalletConnect() {
           <div className="flex items-center gap-3">
             <div className="relative grid h-10 w-10 place-items-center rounded-full border border-[rgba(214,190,112,0.25)] bg-[radial-gradient(circle,rgba(252,246,186,0.16),rgba(0,0,0,0))]">
               <div className="absolute inset-0 rounded-full bg-[radial-gradient(circle,rgba(191,149,63,0.15),transparent_70%)] blur-md" />
-              <span className="relative text-sm tracking-[0.3em] text-amber-100">L2</span>
+              <span className="relative text-sm tracking-[0.3em] text-amber-100">S</span>
             </div>
             <div>
-              <h1 className="text-lg text-white md:text-xl">L2Concept</h1>
+              <h1 className="text-lg text-white md:text-xl">Sable</h1>
               <p className="text-[10px] uppercase tracking-[0.3em] text-zinc-500">
-                Wealth Operations
+                Private Treasury
               </p>
             </div>
           </div>
@@ -85,17 +84,6 @@ export function WalletConnect() {
               </p>
             </div>
             <Pill tone="amber">Delegation Required</Pill>
-          </div>
-        </GlassPanel>
-      ) : null}
-
-      {routingMode === 'router' ? (
-        <GlassPanel className="px-4 py-3">
-          <div className="flex flex-col gap-2 md:flex-row md:items-center md:justify-between">
-            <p className="text-sm text-zinc-300">
-              Magic Router mode is a UI placeholder in this build. Requests still use the selected RPC connection behavior from the current app logic.
-            </p>
-            <Pill>Placeholder</Pill>
           </div>
         </GlassPanel>
       ) : null}

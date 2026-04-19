@@ -23,8 +23,8 @@ const jetbrainsMono = JetBrains_Mono({
 });
 
 export const metadata: Metadata = {
-  title: 'L2Concept V1 - Vault Wallet',
-  description: 'A wallet-like interface for L2Concept V1 with MagicBlock Ephemeral Rollup',
+  title: 'Sable — Private Treasury for AI Agents',
+  description: 'Sable is a private programmable money layer for AI agents on Solana, built on MagicBlock ER + PER',
 };
 
 export default function RootLayout({

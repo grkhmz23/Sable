@@ -9,13 +9,13 @@ fi
 CLUSTER=${1:-devnet}
 echo "Deploying to $CLUSTER..."
 
-cd programs/l2conceptv1
+cd programs/sable
 
 # Deploy
 anchor deploy --provider.cluster $CLUSTER
 
 # Get program ID
-PROGRAM_ID=$(solana address -k target/deploy/l2conceptv1-keypair.json)
+PROGRAM_ID=$(solana address -k target/deploy/sable-keypair.json)
 echo "Program ID: $PROGRAM_ID"
 
 # Initialize if needed
