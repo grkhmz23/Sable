@@ -106,6 +106,27 @@ impl UserBalance {
     pub const SIZE: usize = 32 + 32 + 1 + 8 + 8;
 }
 
+/// Agent balance PDA - tracks balance per mint for an agent
+#[account]
+pub struct AgentBalance {
+    pub agent: Pubkey,
+    pub mint: Pubkey,
+    pub amount: u64,
+    pub version: u64,
+    pub bump: u8,
+}
+
+impl AgentBalance {
+    pub const SIZE: usize = 32 + 32 + 8 + 8 + 1;
+}
+
+/// Recipient kind for transfers
+#[derive(AnchorSerialize, AnchorDeserialize, Clone, Copy, Debug, PartialEq, Eq)]
+pub enum RecipientKind {
+    User = 0,
+    Agent = 1,
+}
+
 /// Vault authority PDA - owns all vault ATAs
 #[account]
 pub struct VaultAuthority {
@@ -121,4 +142,5 @@ impl VaultAuthority {
 pub struct TransferItem {
     pub to_owner: Pubkey,
     pub amount: u64,
+    pub kind: RecipientKind,
 }

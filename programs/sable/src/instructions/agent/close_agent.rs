@@ -1,6 +1,6 @@
 use anchor_lang::prelude::*;
 use crate::error::SableError;
-use crate::state::{AgentState, UserState};
+use crate::state::{AgentBalance, AgentState, UserState};
 
 #[derive(Accounts)]
 pub struct CloseAgent<'info> {
@@ -24,7 +24,7 @@ pub struct CloseAgent<'info> {
 }
 
 /// Close an agent. Only the root_user owner can close.
-/// The agent must have no children.
+/// The agent must have no children and all provided AgentBalance accounts must have amount == 0.
 pub fn close_agent(ctx: Context<CloseAgent>) -> Result<()> {
     let agent = &ctx.accounts.agent;
 
@@ -45,6 +45,43 @@ pub fn close_agent(ctx: Context<CloseAgent>) -> Result<()> {
         agent.child_count == 0,
         SableError::AgentHasChildren
     );
+
+    // Verify all provided AgentBalance accounts have amount == 0 and belong to this agent
+    for balance_acc_info in ctx.remaining_accounts.iter() {
+        let balance_data = balance_acc_info.try_borrow_data()?;
+        
+        // Deserialize as AgentBalance
+        let balance = AgentBalance::try_deserialize(
+            &mut &balance_data[..]
+        )
+        .map_err(|_| error!(SableError::InvalidRecipientAccounts))?;
+
+        // Must belong to the agent being closed
+        require!(
+            balance.agent == agent.key(),
+            SableError::InvalidRecipientAccounts
+        );
+
+        // Must have zero balance
+        require!(
+            balance.amount == 0,
+            SableError::AgentHasBalances
+        );
+
+        // Verify PDA derivation using the mint from the account data
+        let (expected_pda, _) = Pubkey::find_program_address(
+            &[
+                crate::AGENT_BALANCE_SEED.as_bytes(),
+                agent.key().as_ref(),
+                balance.mint.as_ref(),
+            ],
+            ctx.program_id,
+        );
+        require!(
+            balance_acc_info.key() == expected_pda,
+            SableError::InvalidRecipientAccounts
+        );
+    }
 
     // Decrement parent's count by trying to deserialize as each type
     {

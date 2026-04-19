@@ -221,7 +221,7 @@ pub fn spawn_agent(
 ///
 /// `ancestors` must be ordered from root UserState to the immediate parent.
 /// Returns the depth of the new agent (parent's depth + 1).
-fn verify_ancestor_chain(
+pub fn verify_ancestor_chain(
     parent_account: &AccountInfo,
     ancestors: &[AccountInfo],
     program_id: &Pubkey,

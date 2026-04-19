@@ -262,6 +262,10 @@ pub mod sable {
                 item.to_owner != sender_user_state.owner,
                 SableError::SelfTransferNotAllowed
             );
+            require!(
+                item.kind == RecipientKind::User,
+                SableError::InvalidRecipientAccounts
+            );
 
             // Check for duplicate recipients
             require!(
@@ -575,6 +579,35 @@ pub mod sable {
     /// Update an agent's spend policy. Only the root_user owner can set policy.
     pub fn set_policy(ctx: Context<SetPolicy>, policy: SpendPolicy) -> Result<()> {
         instructions::agent::set_policy(ctx, policy)
+    }
+
+    /// Fund an agent by debiting the root user's balance.
+    pub fn fund_agent(ctx: Context<FundAgent>, amount: u64) -> Result<()> {
+        instructions::agent::fund_agent(ctx, amount)
+    }
+
+    /// Defund an agent by crediting the root user's balance.
+    pub fn defund_agent(ctx: Context<DefundAgent>, amount: u64) -> Result<()> {
+        instructions::agent::defund_agent(ctx, amount)
+    }
+
+    /// Transfer from an AgentBalance to a UserBalance or AgentBalance.
+    pub fn agent_transfer(
+        ctx: Context<AgentTransfer>,
+        amount: u64,
+        recipient: Pubkey,
+        recipient_kind: RecipientKind,
+    ) -> Result<()> {
+        instructions::agent::agent_transfer(ctx, amount, recipient, recipient_kind)
+    }
+
+    /// Batch transfer from an AgentBalance to multiple recipients.
+    pub fn agent_transfer_batch(
+        ctx: Context<AgentTransferBatch>,
+        items: Vec<TransferItem>,
+        ancestor_count: u8,
+    ) -> Result<()> {
+        instructions::agent::agent_transfer_batch(ctx, items, ancestor_count)
     }
 
     /// Delegate UserState and UserBalance PDAs to the Ephemeral Rollup.
@@ -1151,3 +1184,4 @@ pub const MAX_BATCH_TRANSFER_RECIPIENTS: usize = 15;
 pub const MAX_MINTS_PER_DELEGATION: usize = 10;
 pub const MAX_MINTS_PER_SETUP: usize = 9; // wSOL + 9 additional = 10 total
 pub const AGENT_COUNTERS_SEED: &str = "agent_counters";
+pub const AGENT_BALANCE_SEED: &str = "agent_balance";

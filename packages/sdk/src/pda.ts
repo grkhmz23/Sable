@@ -6,6 +6,7 @@ const CONFIG_SEED = Buffer.from('config');
 const USER_STATE_SEED = Buffer.from('user_state');
 const AGENT_STATE_SEED = Buffer.from('agent_state');
 const AGENT_COUNTERS_SEED = Buffer.from('agent_counters');
+const AGENT_BALANCE_SEED = Buffer.from('agent_balance');
 const USER_BALANCE_SEED = Buffer.from('user_balance');
 const VAULT_AUTHORITY_SEED = Buffer.from('vault_authority');
 
@@ -62,6 +63,16 @@ export class PdaHelper {
   deriveAgentCounters(agent: PublicKey): [PublicKey, number] {
     return PublicKey.findProgramAddressSync(
       [AGENT_COUNTERS_SEED, agent.toBuffer()],
+      this.programId
+    );
+  }
+
+  /**
+   * Derive AgentBalance PDA for a given agent and mint
+   */
+  deriveAgentBalance(agent: PublicKey, mint: PublicKey): [PublicKey, number] {
+    return PublicKey.findProgramAddressSync(
+      [AGENT_BALANCE_SEED, agent.toBuffer(), mint.toBuffer()],
       this.programId
     );
   }

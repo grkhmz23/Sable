@@ -109,4 +109,13 @@ pub enum SableError {
 
     #[msg("Total lifetime spend limit exceeded")]
     TotalLimitExceeded,
+
+    #[msg("Agent owner not authorized")]
+    AgentNotAuthorized,
+
+    #[msg("Insufficient agent balance")]
+    InsufficientAgentBalance,
+
+    #[msg("Agent still has balances and cannot be closed")]
+    AgentHasBalances,
 }
