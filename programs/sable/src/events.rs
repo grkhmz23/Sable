@@ -104,3 +104,21 @@ pub struct PolicyUpdated {
     pub counterparty_mode: u8,
     pub expires_at: i64,
 }
+
+#[event]
+pub struct AgentFrozen {
+    pub agent: Pubkey,
+    pub frozen_by: Pubkey,
+}
+
+#[event]
+pub struct AgentUnfrozen {
+    pub agent: Pubkey,
+    pub unfrozen_by: Pubkey,
+}
+
+#[event]
+pub struct AgentRevoked {
+    pub agent: Pubkey,
+    pub revoked_by: Pubkey,
+}

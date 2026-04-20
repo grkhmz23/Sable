@@ -610,6 +610,21 @@ pub mod sable {
         instructions::agent::agent_transfer_batch(ctx, items, ancestor_count)
     }
 
+    /// Freeze an agent. Callable by root_user owner or any ancestor agent's owner.
+    pub fn freeze_agent(ctx: Context<FreezeAgent>) -> Result<()> {
+        instructions::agent::freeze_agent(ctx)
+    }
+
+    /// Unfreeze an agent. Callable by root_user owner or any ancestor agent's owner.
+    pub fn unfreeze_agent(ctx: Context<UnfreezeAgent>) -> Result<()> {
+        instructions::agent::unfreeze_agent(ctx)
+    }
+
+    /// Revoke an agent. Only the root_user owner can revoke. Irreversible.
+    pub fn revoke_agent(ctx: Context<RevokeAgent>) -> Result<()> {
+        instructions::agent::revoke_agent(ctx)
+    }
+
     /// Delegate UserState and UserBalance PDAs to the Ephemeral Rollup.
     ///
     /// Remaining accounts (per mint in mint_list, in order):
