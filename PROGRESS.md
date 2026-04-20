@@ -25,8 +25,8 @@
 | 21 | App: Auction marketplace | ✅ | | — | TasksView with Open/My Tasks/My Bids tabs, create task modal, task detail with countdown timer, commit bid with nonce download, reveal bid with file upload, settle action, privacy proof panel. `pnpm -r build` + `pnpm typecheck` pass. |
 | 22 | App: x402 live demo | ✅ | | — | X402DemoView with weather API merchant endpoint (Next.js API route), agent selector, live x402 dance logs, 100-call batch run with throughput stats. `pnpm -r build` + `pnpm typecheck` pass. |
 | 23 | Full integration test suite | ✅ | | — | 8 local specs (treasury, agents, policy, auctions, delegation, PER permissions, x402, private payments API) + live-gated counterparts. Conservation check helper. Test runner script. `pnpm test:integration` command. |
-| 24 | Devnet deployment + MagicBlock testing endpoint | ☐ | | — | THE CREDENTIALS PASS — flips all mocks to live |
-| 25 | README, docs, demo video script | ☐ | | — | |
+| 24 | Devnet deployment + MagicBlock testing endpoint | ☐ | | CREDS | THE CREDENTIALS PASS — flips all mocks to live |
+| 25 | README, docs, demo video script | ✅ | | — | README rewrite with pitch, diagram, quickstart, submission checklist. docs/architecture.md, docs/x402-integration.md, docs/demo-video-script.md created. `pnpm -r build` + `pnpm typecheck` pass. |
 
 Status: ☐ not started · 🔄 in progress · ✅ done · ⚠️ blocked
 Deferred: — nothing deferred · CREDS waiting on credentials · RESOLVED deferred item completed in Prompt 24
