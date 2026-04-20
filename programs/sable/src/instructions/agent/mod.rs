@@ -31,7 +31,8 @@ use crate::state::{AgentState, UserState};
 ///
 /// Returns `Ok(())` if the chain is valid and no ancestor is frozen/revoked.
 pub fn verify_ancestors_not_frozen(
-    agent: &Account<'_, AgentState>,
+    agent: &AgentState,
+    agent_key: &Pubkey,
     ancestors: &[AccountInfo],
     program_id: &Pubkey,
 ) -> Result<()> {
@@ -65,7 +66,7 @@ pub fn verify_ancestors_not_frozen(
         program_id,
     );
     require!(
-        agent.key() == expected_agent_pda,
+        *agent_key == expected_agent_pda,
         SableError::InvalidAncestorChain
     );
 

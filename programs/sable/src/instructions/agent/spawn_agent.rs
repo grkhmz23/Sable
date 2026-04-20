@@ -193,6 +193,7 @@ pub fn spawn_agent(
     new_agent.label = label_arr;
     new_agent.nonce = nonce;
     new_agent.child_count = 0;
+    new_agent.task_count = 0;
     new_agent.frozen = false;
     new_agent.revoked = false;
     new_agent.created_at = clock.unix_timestamp;

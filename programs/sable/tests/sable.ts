@@ -79,6 +79,13 @@ const IDL = {
     { code: 6033, name: 'PerTxLimitExceeded', msg: 'Per-transaction limit exceeded' },
     { code: 6034, name: 'DailyLimitExceeded', msg: 'Daily spend limit exceeded' },
     { code: 6035, name: 'TotalLimitExceeded', msg: 'Total lifetime spend limit exceeded' },
+    { code: 6036, name: 'AgentNotAuthorized', msg: 'Agent owner not authorized' },
+    { code: 6037, name: 'InsufficientAgentBalance', msg: 'Insufficient agent balance' },
+    { code: 6038, name: 'AgentHasBalances', msg: 'Agent still has balances and cannot be closed' },
+    { code: 6039, name: 'TaskDeadlineInvalid', msg: 'Task deadline is invalid' },
+    { code: 6040, name: 'TaskNotCancellable', msg: 'Task cannot be cancelled' },
+    { code: 6041, name: 'TaskEscrowMismatch', msg: 'Task escrow does not match task' },
+    { code: 6042, name: 'TaskWrongState', msg: 'Task is in wrong state for this operation' },
   ],
 };
 

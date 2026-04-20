@@ -72,6 +72,7 @@ pub fn agent_transfer(
     // 3. Verify ancestor chain is not frozen/revoked
     crate::instructions::agent::verify_ancestors_not_frozen(
         agent,
+        &agent.key(),
         ctx.remaining_accounts,
         ctx.program_id,
     )?;

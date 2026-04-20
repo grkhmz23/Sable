@@ -87,6 +87,7 @@ pub fn agent_transfer_batch(
     if ancestor_count > 0 {
         crate::instructions::agent::verify_ancestors_not_frozen(
             agent,
+            &agent.key(),
             ancestors,
             ctx.program_id,
         )?;

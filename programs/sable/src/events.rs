@@ -122,3 +122,21 @@ pub struct AgentRevoked {
     pub agent: Pubkey,
     pub revoked_by: Pubkey,
 }
+
+#[event]
+pub struct TaskCreated {
+    pub task: Pubkey,
+    pub poster: Pubkey,
+    pub mint: Pubkey,
+    pub budget: u64,
+    pub bid_commit_deadline: i64,
+    pub bid_reveal_deadline: i64,
+    pub spec_hash: [u8; 32],
+}
+
+#[event]
+pub struct TaskCancelled {
+    pub task: Pubkey,
+    pub poster: Pubkey,
+    pub refund: u64,
+}

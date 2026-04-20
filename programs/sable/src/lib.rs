@@ -22,6 +22,7 @@ pub mod state;
 use error::*;
 use events::*;
 use instructions::agent::*;
+use instructions::auction::*;
 use state::*;
 
 declare_id!("SaSAXcdWhyr1KD8TKRg6K7WPuxcPLZJHKEwsjQgL5Di");
@@ -63,6 +64,7 @@ pub mod sable {
         user_state.bump = ctx.bumps.user_state;
         user_state.state_version = 0;
         user_state.agent_count = 0;
+        user_state.task_count = 0;
 
         emit!(JoinEvent {
             owner: user_state.owner,
@@ -96,6 +98,7 @@ pub mod sable {
         user_state.bump = ctx.bumps.user_state;
         user_state.state_version = 0;
         user_state.agent_count = 0;
+        user_state.task_count = 0;
 
         // 2. Create wSOL UserBalance (always included by default)
         let wsol_balance = &mut ctx.accounts.wsol_balance;
@@ -623,6 +626,34 @@ pub mod sable {
     /// Revoke an agent. Only the root_user owner can revoke. Irreversible.
     pub fn revoke_agent(ctx: Context<RevokeAgent>) -> Result<()> {
         instructions::agent::revoke_agent(ctx)
+    }
+
+    /// Create a new task (auction listing).
+    pub fn create_task(
+        ctx: Context<CreateTask>,
+        poster_kind: PosterKind,
+        task_id: u64,
+        budget: u64,
+        min_deposit: u64,
+        spec_hash: [u8; 32],
+        bid_commit_deadline: i64,
+        bid_reveal_deadline: i64,
+    ) -> Result<()> {
+        instructions::auction::create_task(
+            ctx,
+            poster_kind,
+            task_id,
+            budget,
+            min_deposit,
+            spec_hash,
+            bid_commit_deadline,
+            bid_reveal_deadline,
+        )
+    }
+
+    /// Cancel a task and refund escrowed budget.
+    pub fn cancel_task(ctx: Context<CancelTask>) -> Result<()> {
+        instructions::auction::cancel_task(ctx)
     }
 
     /// Delegate UserState and UserBalance PDAs to the Ephemeral Rollup.

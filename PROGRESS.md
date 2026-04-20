@@ -9,7 +9,7 @@
 | 5 | Spend policy engine | ✅ | ee1c0fb | SpendPolicy, CounterpartyMode, AgentCounters, validate_spend with 16 Rust unit tests, set_policy instruction, SDK deriveAgentCounters, policy TS tests. cargo test --package sable passes. cargo build-sbf passes. anchor test blocked by GLIBC_2.39 in container.
 | 6 | AgentBalance + agent transfer instructions | ✅ | 7d1078b | AgentBalance, RecipientKind, fund_agent, defund_agent, agent_transfer, agent_transfer_batch. 17 Rust unit tests pass. cargo build-sbf passes.
 | 7 | Parent control: freeze, revoke, update_policy | ✅ | 01e287d | freeze_agent, unfreeze_agent, revoke_agent instructions. Ancestor-chain auth helper. Events: AgentFrozen, AgentUnfrozen, AgentRevoked. cargo build-sbf passes. cargo test --package sable passes. pnpm -r build and typecheck pass. |
-| 8 | Task PDA + create_task / cancel_task | ☐ | | |
+| 8 | Task PDA + create_task / cancel_task | ✅ | 06a5a06 | Task, TaskEscrow, TaskState, PosterKind. create_task + cancel_task instructions. Policy check for agent posters. Budget locked in escrow. Tests for PDA derivations, state machine, deadlines, cancellation rules. |
 | 9 | Bid PDA + commit_bid | ☐ | | |
 | 10 | reveal_bid + settle_auction | ☐ | | |
 | 11 | PER permission metadata accounts | ☐ | | |

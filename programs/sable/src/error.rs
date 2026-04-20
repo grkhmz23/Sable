@@ -118,4 +118,16 @@ pub enum SableError {
 
     #[msg("Agent still has balances and cannot be closed")]
     AgentHasBalances,
+
+    #[msg("Task deadline is invalid")]
+    TaskDeadlineInvalid,
+
+    #[msg("Task cannot be cancelled")]
+    TaskNotCancellable,
+
+    #[msg("Task escrow does not match task")]
+    TaskEscrowMismatch,
+
+    #[msg("Task is in wrong state for this operation")]
+    TaskWrongState,
 }

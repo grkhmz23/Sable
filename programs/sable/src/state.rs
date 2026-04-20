@@ -19,10 +19,11 @@ pub struct UserState {
     pub bump: u8,
     pub state_version: u64,
     pub agent_count: u32,
+    pub task_count: u64,
 }
 
 impl UserState {
-    pub const SIZE: usize = 32 + 1 + 8 + 4;
+    pub const SIZE: usize = 32 + 1 + 8 + 4 + 8;
 }
 
 /// Spend policy for an agent
@@ -64,10 +65,11 @@ pub struct AgentState {
     pub revoked: bool,
     pub created_at: i64,
     pub policy: SpendPolicy,
+    pub task_count: u64,
 }
 
 impl AgentState {
-    pub const SIZE: usize = 1 + 1 + 1 + 32 + 32 + 32 + 32 + 4 + 4 + 1 + 1 + 8 + SpendPolicy::SIZE;
+    pub const SIZE: usize = 1 + 1 + 1 + 32 + 32 + 32 + 32 + 4 + 4 + 1 + 1 + 8 + SpendPolicy::SIZE + 8;
 }
 
 /// Agent counters PDA - running spend counters (keeps AgentState small)
@@ -135,6 +137,59 @@ pub struct VaultAuthority {
 
 impl VaultAuthority {
     pub const SIZE: usize = 1;
+}
+
+/// Task state for auction lifecycle
+#[derive(AnchorSerialize, AnchorDeserialize, Clone, Copy, Debug, PartialEq, Eq)]
+pub enum TaskState {
+    Open = 0,
+    Revealing = 1,
+    Settled = 2,
+    Cancelled = 3,
+}
+
+/// Poster kind for tasks
+#[derive(AnchorSerialize, AnchorDeserialize, Clone, Copy, Debug, PartialEq, Eq)]
+pub enum PosterKind {
+    User = 0,
+    Agent = 1,
+}
+
+/// Task PDA - auction listing
+#[account]
+pub struct Task {
+    pub version: u8,
+    pub bump: u8,
+    pub poster: Pubkey,
+    pub poster_kind: PosterKind,
+    pub mint: Pubkey,
+    pub budget: u64,
+    pub min_deposit: u64,
+    pub spec_hash: [u8; 32],
+    pub bid_commit_deadline: i64,
+    pub bid_reveal_deadline: i64,
+    pub state: TaskState,
+    pub winning_bidder: Pubkey,
+    pub winning_bid: u64,
+    pub bid_count: u32,
+    pub task_id: u64,
+}
+
+impl Task {
+    pub const SIZE: usize = 1 + 1 + 32 + 1 + 32 + 8 + 8 + 32 + 8 + 8 + 1 + 32 + 8 + 4 + 8;
+}
+
+/// Task escrow PDA - holds locked budget + bid deposits
+#[account]
+pub struct TaskEscrow {
+    pub task: Pubkey,
+    pub mint: Pubkey,
+    pub amount: u64,
+    pub bump: u8,
+}
+
+impl TaskEscrow {
+    pub const SIZE: usize = 32 + 32 + 8 + 1;
 }
 
 /// Transfer item for batch transfers
