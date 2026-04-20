@@ -1072,7 +1072,7 @@ DONE CHECKLIST
 
 <a id="prompt-14"></a>
 ## Prompt 14 — SDK: auction methods
-> **COMPLETED** — commit `PENDING`
+> **COMPLETED** — commit `f61cf07`
 
 ```
 GOAL
@@ -1113,10 +1113,10 @@ DO NOT
 - Reuse nonces across bids.
 
 DONE CHECKLIST
-- [ ] All methods work
-- [ ] keccak256 parity test passes (Rust vectors === TS vectors)
-- [ ] PROGRESS.md updated
-- [ ] Commit: "sable: prompt 14 — SDK auctions"
+- [x] All methods work
+- [x] keccak256 parity test passes (Rust vectors === TS vectors)
+- [x] PROGRESS.md updated
+- [x] Commit: "sable: prompt 14 — SDK auctions"
 ```
 
 ---

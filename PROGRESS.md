@@ -15,7 +15,7 @@
 | 11 | PER permission metadata accounts | ✅ | 8663d9a | — | permission_cpi module with manual borsh CPI to PER permission program. Auto-init in complete_setup, add_mint, fund_agent, create_task. SDK: derivePermission() + PERMISSION_PROGRAM_ID. cargo build-sbf + cargo test pass. pnpm -r build + typecheck pass. |
 | 12 | SDK rename, IDL regen, module restructure | ✅ | 8663d9a | — | Generated IDL via cargo test --features idl-build. SDK split into treasury/transfer/delegation modules. SableClient exposes module accessors + backward-compat methods. App imports unchanged. Tests structured. |
 | 13 | SDK: agent methods | ✅ | e3135b7 | — | AgentsModule with spawnAgent, closeAgent, fundAgent, defundAgent, setPolicy, freezeAgent, unfreezeAgent, revokeAgent, agentTransfer, agentTransferBatch, listAgents, getAgent. Auto-derives PDAs, ancestor chains, PER permissions. SpendPolicy TS mirror. pnpm -r build + typecheck pass. cargo test --package sable passes. |
-| 14 | SDK: auction methods | 🔄 | | — | AuctionsModule with createTask, cancelTask, commitBid, revealBid, settleAuction, getTask, getBid, getTaskBids, listTasks. keccak256 helper in @sable/common with 3 Rust-TS parity test vectors. pnpm -r build + typecheck pass. cargo test --package sable passes.
+| 14 | SDK: auction methods | ✅ | f61cf07 | — | AuctionsModule with createTask, cancelTask, commitBid, revealBid, settleAuction, getTask, getBid, getTaskBids, listTasks. keccak256 helper in @sable/common with 3 Rust-TS parity test vectors. pnpm -r build + typecheck pass. cargo test --package sable passes.
 | 15 | SDK: PER session key flow | ☐ | | — | |
 | 16 | SDK: Private Payments API adapter | ☐ | | — | |
 | 17 | x402 facilitator service | ☐ | | — | |
