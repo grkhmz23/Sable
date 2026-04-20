@@ -16,12 +16,33 @@ import type { SdkConfig, TransactionResult, SendTransactionOpts } from './types'
 // Load the generated IDL
 import idlJson from '../idl/sable.json';
 
-// Anchor 0.32 IDL format has metadata.name/version; Program constructor expects top-level fields
-const idl = {
+// Anchor 0.32 IDL format has metadata.name/version; Program constructor expects top-level fields.
+// Also strip Rust module path prefixes (e.g. "sable::state::UserState" -> "UserState") so
+// runtime account namespace keys match the camelCase names SDK code expects (userState, etc.).
+// Anchor 0.32 preserves Rust module paths in IDL account names (e.g. sable::state::userState).
+// Runtime namespace access expects bare names. This preprocessor strips the module prefix.
+// Remove if Anchor's TS client handles this automatically in a future version.
+function stripModulePrefix(obj: any): any {
+  if (Array.isArray(obj)) return obj.map(stripModulePrefix);
+  if (typeof obj === 'object' && obj !== null) {
+    const result: any = {};
+    for (const [key, value] of Object.entries(obj)) {
+      if (key === 'name' && typeof value === 'string') {
+        result[key] = value.replace(/^sable::state::/, '');
+      } else {
+        result[key] = stripModulePrefix(value);
+      }
+    }
+    return result;
+  }
+  return obj;
+}
+
+const idl = stripModulePrefix({
   ...idlJson,
   name: (idlJson as any).metadata?.name || (idlJson as any).name,
   version: (idlJson as any).metadata?.version || (idlJson as any).version,
-};
+});
 
 export class SableClient {
   program: any;
