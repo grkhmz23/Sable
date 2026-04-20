@@ -28,5 +28,16 @@
 | 24 | Devnet deployment + MagicBlock testing endpoint | ☐ | | CREDS | THE CREDENTIALS PASS — flips all mocks to live |
 | 25 | README, docs, demo video script | ✅ | | — | README rewrite with pitch, diagram, quickstart, submission checklist. docs/architecture.md, docs/x402-integration.md, docs/demo-video-script.md created. `pnpm -r build` + `pnpm typecheck` pass. |
 
+## Amendment 03 Migration PRs
+
+| # | PR | Status | Commit | Notes |
+|---|----|--------|--------|-------|
+| 1 | Constants & environment | ✅ | eb6ef40 | MagicBlock endpoints, validator pubkeys, devnet USDC mint, `.env.example`, `docs/magicblock-integration.md` |
+| 2 | Permission CPIs + validator config | ✅ | a51cd4e | Raw manual CPIs (borsh conflict workaround), `ER_VALIDATOR_TEE`, `InvalidBufferPda`/`InvalidRecordPda`/`InvalidMetadataPda` errors |
+| 3 | Magic Router integration | ✅ | 35d34b9 | `routerConnection` in `SdkConfig`, auto-router for ER-bound txs, `WalletContext` ER mode via `MAGIC_ROUTER_URL` |
+| 4 | Private Payments API rewrite | ✅ | d2d0fd1 | Router-aware `SablePayments` with `buildDepositPayload` + `submit(signedTx, payload)`, v0 tx support, `FundModal` payload flow |
+| 5 | PER session rewrite | ✅ | ee1c0fb | `nacl.sign.detached` signing, event system (`onExpire`/`onRefresh`/`onClose`), `SableSessionManager`, reactive `useSableSession()` hook, async `close()` with server invalidation |
+| 6 | App wiring | ✅ | 1350812 | `formatAmount`/`parseAmount` in `@sable/common`, `refreshUserState` wired in `WalletContext`, routing mode pill in `AppHeader`, Activity feed unified, ActionPanel placeholder tabs cleaned, cross-component cache invalidation. All 4 verification commands green. |
+
 Status: ☐ not started · 🔄 in progress · ✅ done · ⚠️ blocked
 Deferred: — nothing deferred · CREDS waiting on credentials · RESOLVED deferred item completed in Prompt 24
