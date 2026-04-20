@@ -23,7 +23,7 @@
 | 19 | App: Treasury console | ✅ | | — | TreasuryView with FundModal (AML + buildDeposit), session-gated BalanceList, ActivityFeed with 10s polling, delegation/auto-session flows. `pnpm app:dev` builds clean. Devnet + live payments verification DEFERRED TO CREDENTIALS PASS. |
 | 20 | App: Agent dashboard | ✅ | | — | AgentsView with tree hierarchy, detail pane (balances, policy, actions), spawn modal with keypair generation/download, policy editor with live preview, fund/defund modals. `pnpm -r build` + `pnpm typecheck` pass. |
 | 21 | App: Auction marketplace | ✅ | | — | TasksView with Open/My Tasks/My Bids tabs, create task modal, task detail with countdown timer, commit bid with nonce download, reveal bid with file upload, settle action, privacy proof panel. `pnpm -r build` + `pnpm typecheck` pass. |
-| 22 | App: x402 live demo | ☐ | | — | |
+| 22 | App: x402 live demo | ✅ | | — | X402DemoView with weather API merchant endpoint (Next.js API route), agent selector, live x402 dance logs, 100-call batch run with throughput stats. `pnpm -r build` + `pnpm typecheck` pass. |
 | 23 | Full integration test suite | ☐ | | — | |
 | 24 | Devnet deployment + MagicBlock testing endpoint | ☐ | | — | THE CREDENTIALS PASS — flips all mocks to live |
 | 25 | README, docs, demo video script | ☐ | | — | |
