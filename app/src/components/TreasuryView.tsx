@@ -104,10 +104,10 @@ export function TreasuryView() {
       setIsDelegated(true);
 
       // Auto-open session after delegation
-      const perMockUrl = env.PER_MOCK_URL;
-      if (perMockUrl && sdk) {
+      const perHttpUrl = env.PER_HTTP_URL;
+      if (perHttpUrl && sdk) {
         try {
-          await sdk.openSession(perMockUrl, 3600);
+          await sdk.openSession(perHttpUrl, 3600);
           toast.success('PER session auto-opened');
         } catch (sessionErr: any) {
           console.warn('Auto session open failed:', sessionErr);

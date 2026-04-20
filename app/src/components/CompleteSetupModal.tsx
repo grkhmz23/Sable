@@ -179,7 +179,7 @@ export function CompleteSetupModal({
             value={mintInput}
             onChange={(e) => setMintInput(e.target.value)}
             placeholder={
-              'EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v\nEs9vMFrzaCERmJfrF4H2FYD4KCoNkY11McCe8BenwNYB'
+              '4zMMC9srt5Ri5X14GAgXhaHii3GnPAEERYPJgZJDncDU\nEs9vMFrzaCERmJfrF4H2FYD4KCoNkY11McCe8BenwNYB'
             }
             error={
               filteredMints.length > 9

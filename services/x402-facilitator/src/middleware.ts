@@ -36,7 +36,7 @@ export interface SableX402Options {
 }
 
 export function sableX402(options: SableX402Options) {
-  const asset = options.asset || new PublicKey('EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v');
+  const asset = options.asset || new PublicKey('4zMMC9srt5Ri5X14GAgXhaHii3GnPAEERYPJgZJDncDU');
   const network = options.network || 'solana:devnet';
   const resource = 'unknown';
 

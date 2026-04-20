@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 
 const FACILITATOR_URL = process.env.SABLE_X402_FACILITATOR_URL || 'http://localhost:5555';
-const DEFAULT_ASSET = 'EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v'; // USDC devnet
+const DEFAULT_ASSET = '4zMMC9srt5Ri5X14GAgXhaHii3GnPAEERYPJgZJDncDU'; // USDC devnet
 const PRICE = '10000'; // 0.01 USDC (6 decimals)
 
 function getWeatherData(city: string) {

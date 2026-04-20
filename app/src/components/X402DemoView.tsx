@@ -78,7 +78,7 @@ export function X402DemoView() {
       return;
     }
     try {
-      const usdcMint = new PublicKey('EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v');
+      const usdcMint = new PublicKey('4zMMC9srt5Ri5X14GAgXhaHii3GnPAEERYPJgZJDncDU');
       const bal = await sdk.agents.getAgentBalance(selectedAgent.pubkey, usdcMint);
       setAgentBalance(bal ? bal.amount.toString() : '0');
     } catch {

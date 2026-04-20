@@ -728,7 +728,7 @@ function DelegateForm() {
         rows={4}
         value={mintList}
         onChange={(e) => setMintList(e.target.value)}
-        placeholder="So11111111111111111111111111111111111111112, EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v"
+        placeholder="So11111111111111111111111111111111111111112, 4zMMC9srt5Ri5X14GAgXhaHii3GnPAEERYPJgZJDncDU"
       />
 
       <div className="rounded-2xl border border-white/8 bg-black/30 p-4">
