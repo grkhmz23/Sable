@@ -12,8 +12,8 @@
 | 8 | Task PDA + create_task / cancel_task | ✅ | 06a5a06 | Task, TaskEscrow, TaskState, PosterKind. create_task + cancel_task instructions. Policy check for agent posters. Budget locked in escrow. Tests for PDA derivations, state machine, deadlines, cancellation rules. |
 | 9 | Bid PDA + commit_bid | ✅ | a4359f6 | Bid, BidderKind, commit_bid instruction. Policy check for agent bidders. Deposit locked in escrow. Commit hash scheme documented in ARCHITECTURE.md. Tests for PDA derivations, hash scheme, constraints. |
 | 10 | reveal_bid + settle_auction | ✅ | ada571a | reveal_bid + settle_auction instructions. Deterministic tie-breaking. Escrow conservation with debug_assert!. Winner/non-winner/poster payouts. Tests for winner selection, payout math, constraints. |
-| 11 | PER permission metadata accounts | ☐ | | |
-| 12 | SDK rename, IDL regen, module restructure | ☐ | | |
+| 11 | PER permission metadata accounts | ✅ | | cargo build-sbf + cargo test pass. pnpm -r build + typecheck pass. |
+| 12 | SDK rename, IDL regen, module restructure | ✅ | | Generated IDL via cargo test --features idl-build. SDK split into treasury/transfer/delegation modules. SableClient exposes module accessors + backward-compat methods. App imports unchanged. Tests structured. |
 | 13 | SDK: agent methods | ☐ | | |
 | 14 | SDK: auction methods | ☐ | | |
 | 15 | SDK: PER session key flow | ☐ | | |

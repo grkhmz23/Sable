@@ -47,6 +47,13 @@ pub struct FundAgent<'info> {
     pub mint: AccountInfo<'info>,
 
     pub system_program: Program<'info, System>,
+
+    /// CHECK: MagicBlock PER permission program
+    pub permission_program: AccountInfo<'info>,
+
+    /// CHECK: Permission PDA for agent_balance, validated in instruction
+    #[account(mut)]
+    pub permission: AccountInfo<'info>,
 }
 
 /// Fund an agent by debiting the root user's balance and crediting the agent's balance.
@@ -85,7 +92,8 @@ pub fn fund_agent(ctx: Context<FundAgent>, amount: u64) -> Result<()> {
 
     // Credit agent balance
     let agent_balance = &mut ctx.accounts.agent_balance;
-    if agent_balance.amount == 0 {
+    let is_first_fund = agent_balance.amount == 0;
+    if is_first_fund {
         // First time funding this mint — initialize fields
         agent_balance.agent = ctx.accounts.agent.key();
         agent_balance.mint = ctx.accounts.mint.key();
@@ -100,6 +108,27 @@ pub fn fund_agent(ctx: Context<FundAgent>, amount: u64) -> Result<()> {
         .version
         .checked_add(1)
         .ok_or(SableError::Overflow)?;
+
+    // Create PER permission on first fund
+    if is_first_fund {
+        let agent_key = ctx.accounts.agent.key();
+        let mint_key = ctx.accounts.mint.key();
+        let signer_seeds: &[&[&[u8]]] = &[&[
+            crate::AGENT_BALANCE_SEED.as_bytes(),
+            agent_key.as_ref(),
+            mint_key.as_ref(),
+            &[ctx.bumps.agent_balance],
+        ]];
+        crate::permission_cpi::create_permission(
+            &ctx.accounts.permission_program,
+            &ctx.accounts.agent_balance.to_account_info(),
+            &ctx.accounts.permission,
+            &ctx.accounts.root_owner.to_account_info(),
+            &ctx.accounts.system_program.to_account_info(),
+            ctx.accounts.root_owner.key(),
+            signer_seeds,
+        )?;
+    }
 
     // Update root user state version
     let root_user_state = &mut ctx.accounts.root_user_state;

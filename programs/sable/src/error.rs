@@ -136,4 +136,7 @@ pub enum SableError {
 
     #[msg("Bid reveal hash does not match commitment")]
     InvalidReveal,
+
+    #[msg("Permission metadata initialization failed")]
+    PermissionInitFailed,
 }

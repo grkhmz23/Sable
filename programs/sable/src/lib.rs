@@ -25,6 +25,94 @@ use instructions::agent::*;
 use instructions::auction::*;
 use state::*;
 
+/// Helper for CPI calls to the MagicBlock PER permission program.
+mod permission_cpi {
+    use super::*;
+    use solana_program::{
+        instruction::{AccountMeta, Instruction},
+        program::invoke_signed,
+    };
+
+    pub const PERMISSION_PROGRAM_ID: Pubkey =
+        pubkey!("ACLseoPoyC3cBqoUtkbjZ4aDrkurZW86v19pXz2XQnp1");
+    pub const PERMISSION_SEED: &[u8] = b"permission:";
+
+    pub const AUTHORITY_FLAG: u8 = 1 << 0;
+    pub const TX_LOGS_FLAG: u8 = 1 << 1;
+    pub const TX_BALANCES_FLAG: u8 = 1 << 2;
+    pub const TX_MESSAGE_FLAG: u8 = 1 << 3;
+    pub const ACCOUNT_SIGNATURES_FLAG: u8 = 1 << 4;
+
+    /// CPI call to the permission program's `create_permission` instruction.
+    /// Grants the `authority` full visibility and authority flags over the
+    /// `permissioned_account`.
+    pub fn create_permission<'info>(
+        permission_program: &AccountInfo<'info>,
+        permissioned_account: &AccountInfo<'info>,
+        permission_pda: &AccountInfo<'info>,
+        payer: &AccountInfo<'info>,
+        system_program: &AccountInfo<'info>,
+        authority: Pubkey,
+        signers_seeds: &[&[&[u8]]],
+    ) -> Result<()> {
+        // Validate permission program
+        require!(
+            permission_program.key() == PERMISSION_PROGRAM_ID,
+            SableError::InvalidRecipientAccounts
+        );
+
+        // Validate permission PDA
+        let (expected_permission, _) = Pubkey::find_program_address(
+            &[PERMISSION_SEED, permissioned_account.key.as_ref()],
+            &PERMISSION_PROGRAM_ID,
+        );
+        require!(
+            permission_pda.key() == expected_permission,
+            SableError::InvalidRecipientAccounts
+        );
+
+        // Build instruction data:
+        // discriminator (u64 = 0) + MembersArgs { members: Some(vec![Member]) }
+        let mut data = vec![0u8; 8]; // discriminator
+
+        // Serialize MembersArgs manually (borsh-compatible):
+        // Option::Some = 1u8, Vec<u32> length, Member { flags: u8, pubkey: [u8; 32] }
+        let flags = AUTHORITY_FLAG
+            | TX_LOGS_FLAG
+            | TX_BALANCES_FLAG
+            | TX_MESSAGE_FLAG
+            | ACCOUNT_SIGNATURES_FLAG;
+        data.push(1); // Some variant
+        data.extend_from_slice(&1u32.to_le_bytes()); // vec length = 1
+        data.push(flags);
+        data.extend_from_slice(&authority.to_bytes());
+
+        let instruction = Instruction {
+            program_id: PERMISSION_PROGRAM_ID,
+            accounts: vec![
+                AccountMeta::new_readonly(*permissioned_account.key, true),
+                AccountMeta::new(*permission_pda.key, false),
+                AccountMeta::new(*payer.key, true),
+                AccountMeta::new_readonly(*system_program.key, false),
+            ],
+            data,
+        };
+
+        let account_infos = &[
+            permission_program.clone(),
+            permissioned_account.clone(),
+            permission_pda.clone(),
+            payer.clone(),
+            system_program.clone(),
+        ];
+
+        invoke_signed(&instruction, account_infos, signers_seeds)
+            .map_err(|_| error!(SableError::PermissionInitFailed))?;
+
+        Ok(())
+    }
+}
+
 declare_id!("SaSAXcdWhyr1KD8TKRg6K7WPuxcPLZJHKEwsjQgL5Di");
 
 // wSOL mint address - always included by default
@@ -75,8 +163,8 @@ pub mod sable {
 
     /// Complete setup by creating UserState and wSOL UserBalance (always included by default)
     /// Additional mints can be added in the same transaction via remaining_accounts
-    pub fn complete_setup(
-        ctx: Context<CompleteSetup>,
+    pub fn complete_setup<'info>(
+        ctx: Context<'_, '_, '_, 'info, CompleteSetup<'info>>,
         additional_mints: Vec<Pubkey>,
     ) -> Result<()> {
         // Validate mint count
@@ -108,16 +196,85 @@ pub mod sable {
         wsol_balance.amount = 0;
         wsol_balance.version = 0;
 
+        // Create PER permission for wSOL balance
+        let owner_key = ctx.accounts.owner.key();
+
+        require!(
+            ctx.accounts.permission_program.key() == permission_cpi::PERMISSION_PROGRAM_ID,
+            SableError::InvalidRecipientAccounts
+        );
+        let (expected_wsol_permission, _) = Pubkey::find_program_address(
+            &[permission_cpi::PERMISSION_SEED, ctx.accounts.wsol_balance.key().as_ref()],
+            &permission_cpi::PERMISSION_PROGRAM_ID,
+        );
+        require!(
+            ctx.accounts.wsol_permission.key() == expected_wsol_permission,
+            SableError::InvalidRecipientAccounts
+        );
+
+        let mut wsol_data = vec![0u8; 8]; // discriminator
+        let wsol_flags = permission_cpi::AUTHORITY_FLAG
+            | permission_cpi::TX_LOGS_FLAG
+            | permission_cpi::TX_BALANCES_FLAG
+            | permission_cpi::TX_MESSAGE_FLAG
+            | permission_cpi::ACCOUNT_SIGNATURES_FLAG;
+        wsol_data.push(1); // Some variant
+        wsol_data.extend_from_slice(&1u32.to_le_bytes());
+        wsol_data.push(wsol_flags);
+        wsol_data.extend_from_slice(&owner_key.to_bytes());
+
+        let wsol_instruction = solana_program::instruction::Instruction {
+            program_id: permission_cpi::PERMISSION_PROGRAM_ID,
+            accounts: vec![
+                solana_program::instruction::AccountMeta::new_readonly(
+                    ctx.accounts.wsol_balance.key(),
+                    true,
+                ),
+                solana_program::instruction::AccountMeta::new(
+                    ctx.accounts.wsol_permission.key(),
+                    false,
+                ),
+                solana_program::instruction::AccountMeta::new(ctx.accounts.owner.key(), true),
+                solana_program::instruction::AccountMeta::new_readonly(
+                    ctx.accounts.system_program.key(),
+                    false,
+                ),
+            ],
+            data: wsol_data,
+        };
+
+        let wsol_signer_seeds: &[&[&[u8]]] = &[&[
+            USER_BALANCE_SEED.as_bytes(),
+            owner_key.as_ref(),
+            WSOL_MINT.as_ref(),
+            &[ctx.bumps.wsol_balance],
+        ]];
+
+        let wsol_account_infos = &[
+            ctx.accounts.permission_program.to_account_info().clone(),
+            ctx.accounts.wsol_balance.to_account_info().clone(),
+            ctx.accounts.wsol_permission.to_account_info().clone(),
+            ctx.accounts.owner.to_account_info().clone(),
+            ctx.accounts.system_program.to_account_info().clone(),
+        ];
+
+        solana_program::program::invoke_signed(
+            &wsol_instruction,
+            wsol_account_infos,
+            wsol_signer_seeds,
+        )
+        .map_err(|_| error!(SableError::PermissionInitFailed))?;
+
         // 3. Validate and create additional UserBalance accounts from remaining_accounts
         // Remaining accounts structure:
         // [0..n]: Mint accounts (to validate)
         // [n..2n]: UserBalance accounts (to initialize)
+        // [2n..3n]: Permission PDAs for each balance
         let remaining = ctx.remaining_accounts;
         let n = additional_mints.len();
-        let owner_key = ctx.accounts.owner.key();
 
         require!(
-            remaining.len() == n * 2,
+            remaining.len() == n * 3,
             SableError::InvalidRecipientAccounts
         );
 
@@ -143,7 +300,7 @@ pub mod sable {
                 owner_key.as_ref(),
                 mint_key.as_ref(),
             ];
-            let (expected_pda, _bump) =
+            let (expected_pda, bump) =
                 Pubkey::find_program_address(expected_seeds, ctx.program_id);
             require!(
                 balance_acc.key() == expected_pda,
@@ -160,11 +317,79 @@ pub mod sable {
             // Mint
             data[40..72].copy_from_slice(&mint_key.to_bytes());
             // Bump
-            data[72] = _bump;
+            data[72] = bump;
             // Amount (0)
             data[73..81].copy_from_slice(&0u64.to_le_bytes());
             // Version (0)
             data[81..89].copy_from_slice(&0u64.to_le_bytes());
+            drop(data);
+
+            // Create PER permission for this balance
+            let permission_acc = &remaining[2 * n + i];
+
+            // Validate permission program
+            require!(
+                ctx.accounts.permission_program.key() == permission_cpi::PERMISSION_PROGRAM_ID,
+                SableError::InvalidRecipientAccounts
+            );
+
+            // Validate permission PDA
+            let (expected_permission, _) = Pubkey::find_program_address(
+                &[permission_cpi::PERMISSION_SEED, balance_acc.key.as_ref()],
+                &permission_cpi::PERMISSION_PROGRAM_ID,
+            );
+            require!(
+                permission_acc.key() == expected_permission,
+                SableError::InvalidRecipientAccounts
+            );
+
+            // Build instruction data manually
+            let mut data = vec![0u8; 8]; // discriminator
+            let flags = permission_cpi::AUTHORITY_FLAG
+                | permission_cpi::TX_LOGS_FLAG
+                | permission_cpi::TX_BALANCES_FLAG
+                | permission_cpi::TX_MESSAGE_FLAG
+                | permission_cpi::ACCOUNT_SIGNATURES_FLAG;
+            data.push(1); // Some variant
+            data.extend_from_slice(&1u32.to_le_bytes());
+            data.push(flags);
+            data.extend_from_slice(&owner_key.to_bytes());
+
+            let instruction = solana_program::instruction::Instruction {
+                program_id: permission_cpi::PERMISSION_PROGRAM_ID,
+                accounts: vec![
+                    solana_program::instruction::AccountMeta::new_readonly(*balance_acc.key, true),
+                    solana_program::instruction::AccountMeta::new(*permission_acc.key, false),
+                    solana_program::instruction::AccountMeta::new(*ctx.accounts.owner.key, true),
+                    solana_program::instruction::AccountMeta::new_readonly(
+                        *ctx.accounts.system_program.key,
+                        false,
+                    ),
+                ],
+                data,
+            };
+
+            let balance_signer_seeds: &[&[&[u8]]] = &[&[
+                USER_BALANCE_SEED.as_bytes(),
+                owner_key.as_ref(),
+                mint_key.as_ref(),
+                &[bump],
+            ]];
+
+            let account_infos = &[
+                ctx.accounts.permission_program.clone(),
+                balance_acc.clone(),
+                permission_acc.clone(),
+                ctx.accounts.owner.to_account_info().clone(),
+                ctx.accounts.system_program.to_account_info().clone(),
+            ];
+
+            solana_program::program::invoke_signed(
+                &instruction,
+                account_infos,
+                balance_signer_seeds,
+            )
+            .map_err(|_| error!(SableError::PermissionInitFailed))?;
         }
 
         emit!(CompleteSetupEvent {
@@ -191,11 +416,30 @@ pub mod sable {
         drop(mint_data);
 
         let user_balance = &mut ctx.accounts.user_balance;
-        user_balance.owner = ctx.accounts.owner.key();
-        user_balance.mint = ctx.accounts.mint.key();
+        let owner_key = ctx.accounts.owner.key();
+        let mint_key = ctx.accounts.mint.key();
+        user_balance.owner = owner_key;
+        user_balance.mint = mint_key;
         user_balance.bump = ctx.bumps.user_balance;
         user_balance.amount = 0;
         user_balance.version = 0;
+
+        // Create PER permission for this balance
+        let signer_seeds: &[&[&[u8]]] = &[&[
+            USER_BALANCE_SEED.as_bytes(),
+            owner_key.as_ref(),
+            mint_key.as_ref(),
+            &[ctx.bumps.user_balance],
+        ]];
+        permission_cpi::create_permission(
+            &ctx.accounts.permission_program,
+            &user_balance.to_account_info(),
+            &ctx.accounts.permission,
+            &ctx.accounts.owner.to_account_info(),
+            &ctx.accounts.system_program.to_account_info(),
+            owner_key,
+            signer_seeds,
+        )?;
 
         emit!(AddMintEvent {
             owner: user_balance.owner,
@@ -986,6 +1230,13 @@ pub struct CompleteSetup<'info> {
     pub wsol_balance: Account<'info, UserBalance>,
 
     pub system_program: Program<'info, System>,
+
+    /// CHECK: MagicBlock PER permission program
+    pub permission_program: AccountInfo<'info>,
+
+    /// CHECK: Permission PDA for wsol_balance, validated in instruction
+    #[account(mut)]
+    pub wsol_permission: AccountInfo<'info>,
 }
 
 #[derive(Accounts)]
@@ -1018,6 +1269,13 @@ pub struct AddMint<'info> {
     pub user_balance: Account<'info, UserBalance>,
 
     pub system_program: Program<'info, System>,
+
+    /// CHECK: MagicBlock PER permission program
+    pub permission_program: AccountInfo<'info>,
+
+    /// CHECK: Permission PDA for user_balance, validated in instruction
+    #[account(mut)]
+    pub permission: AccountInfo<'info>,
 }
 
 #[derive(Accounts)]

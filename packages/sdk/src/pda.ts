@@ -9,6 +9,12 @@ const AGENT_COUNTERS_SEED = Buffer.from('agent_counters');
 const AGENT_BALANCE_SEED = Buffer.from('agent_balance');
 const USER_BALANCE_SEED = Buffer.from('user_balance');
 const VAULT_AUTHORITY_SEED = Buffer.from('vault_authority');
+const PERMISSION_SEED = Buffer.from('permission:');
+
+// MagicBlock PER permission program
+export const PERMISSION_PROGRAM_ID = new PublicKey(
+  'ACLseoPoyC3cBqoUtkbjZ4aDrkurZW86v19pXz2XQnp1'
+);
 
 export class PdaHelper {
   constructor(private programId: PublicKey) {}
@@ -20,6 +26,16 @@ export class PdaHelper {
     return PublicKey.findProgramAddressSync(
       [CONFIG_SEED],
       this.programId
+    );
+  }
+
+  /**
+   * Derive Permission PDA for a given permissioned account
+   */
+  derivePermission(permissionedAccount: PublicKey): [PublicKey, number] {
+    return PublicKey.findProgramAddressSync(
+      [PERMISSION_SEED, permissionedAccount.toBuffer()],
+      PERMISSION_PROGRAM_ID
     );
   }
 

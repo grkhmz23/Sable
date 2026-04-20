@@ -57,6 +57,13 @@ pub struct CreateTask<'info> {
     pub agent_counters: AccountInfo<'info>,
 
     pub system_program: Program<'info, System>,
+
+    /// CHECK: MagicBlock PER permission program
+    pub permission_program: AccountInfo<'info>,
+
+    /// CHECK: Permission PDA for task_escrow, validated in instruction
+    #[account(mut)]
+    pub permission: AccountInfo<'info>,
 }
 
 /// Create a new task (auction listing).
@@ -197,6 +204,23 @@ pub fn create_task(
     task_escrow.mint = mint_key;
     task_escrow.amount = budget;
     task_escrow.bump = ctx.bumps.task_escrow;
+
+    // Create PER permission for task_escrow
+    let task_key = ctx.accounts.task.key();
+    let escrow_signer_seeds: &[&[&[u8]]] = &[&[
+        TASK_ESCROW_SEED.as_bytes(),
+        task_key.as_ref(),
+        &[ctx.bumps.task_escrow],
+    ]];
+    crate::permission_cpi::create_permission(
+        &ctx.accounts.permission_program,
+        &ctx.accounts.task_escrow.to_account_info(),
+        &ctx.accounts.permission,
+        &ctx.accounts.poster_owner.to_account_info(),
+        &ctx.accounts.system_program.to_account_info(),
+        signer,
+        escrow_signer_seeds,
+    )?;
 
     // Initialize Task
     let task = &mut ctx.accounts.task;
