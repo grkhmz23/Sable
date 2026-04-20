@@ -1,4 +1,4 @@
-import { Connection, Keypair, PublicKey, LAMPORTS_PER_SOL, Transaction, sendAndConfirmTransaction } from '@solana/web3.js';
+import { Connection, Keypair, PublicKey, LAMPORTS_PER_SOL, Transaction, sendAndConfirmTransaction, SystemProgram } from '@solana/web3.js';
 import { BN } from '@coral-xyz/anchor';
 import { getAssociatedTokenAddressSync, createMint, mintTo, createAssociatedTokenAccountInstruction, getOrCreateAssociatedTokenAccount } from '@solana/spl-token';
 import { SableClient } from '@sable/sdk';
@@ -90,14 +90,49 @@ export async function ensureSdk(): Promise<SableClient> {
   return sdk;
 }
 
-export async function setupUser(): Promise<{ sdk: SableClient; wallet: Keypair; mint: PublicKey }> {
-  const sdk = await ensureSdk();
-  const wallet = getWallet();
+export async function setupUser(
+  testUserKeypair?: Keypair
+): Promise<{ sdk: SableClient; wallet: Keypair; mint: PublicKey }> {
+  const wallet = testUserKeypair || Keypair.generate();
+  const connection = getConnection();
   const mint = await getMint();
+
+  // Fund test user with SOL (airdrop preferred, deployer fallback if rate-limited)
+  const balance = await connection.getBalance(wallet.publicKey);
+  if (balance < 2 * LAMPORTS_PER_SOL) {
+    try {
+      await connection.requestAirdrop(wallet.publicKey, 2 * LAMPORTS_PER_SOL);
+    } catch {
+      const deployer = getWallet();
+      const transferIx = SystemProgram.transfer({
+        fromPubkey: deployer.publicKey,
+        toPubkey: wallet.publicKey,
+        lamports: 2 * LAMPORTS_PER_SOL,
+      });
+      await sendAndConfirmTransaction(connection, new Transaction().add(transferIx), [deployer]);
+    }
+    await sleep(500);
+  }
+
+  const sdk = new SableClient({
+    programId: PROGRAM_ID,
+    connection,
+    wallet: {
+      publicKey: wallet.publicKey,
+      signTransaction: async (tx: any) => {
+        tx.partialSign(wallet);
+        return tx;
+      },
+      signAllTransactions: async (txs: any[]) => {
+        txs.forEach((tx) => tx.partialSign(wallet));
+        return txs;
+      },
+    },
+  });
 
   // Ensure user is joined
   const userStatePda = sdk.pda.deriveUserState(wallet.publicKey)[0];
-  const existingUserState = await getConnection().getAccountInfo(userStatePda);
+  const existingUserState = await connection.getAccountInfo(userStatePda);
   if (!existingUserState) {
     await sdk.join();
     await sleep(500);
@@ -112,17 +147,19 @@ export async function setupUser(): Promise<{ sdk: SableClient; wallet: Keypair; 
 
   // Vault ATA is created on-demand by deposit (init_if_needed)
 
-  // Mint tokens to wallet ATA then deposit
+  // Ensure wallet ATA exists
   const walletAta = getAssociatedTokenAddressSync(mint, wallet.publicKey);
-  const walletAtaInfo = await getConnection().getAccountInfo(walletAta);
+  const walletAtaInfo = await connection.getAccountInfo(walletAta);
   if (!walletAtaInfo) {
     const tx = new Transaction().add(
       createAssociatedTokenAccountInstruction(wallet.publicKey, walletAta, wallet.publicKey, mint)
     );
-    await sendAndConfirmTransaction(getConnection(), tx, [wallet]);
+    await sendAndConfirmTransaction(connection, tx, [wallet]);
   }
 
-  await mintTo(getConnection(), wallet, mint, walletAta, wallet.publicKey, 1_000_000_000);
+  // Mint tokens to wallet ATA (deployer is mint authority)
+  const deployer = getWallet();
+  await mintTo(connection, deployer, mint, walletAta, deployer.publicKey, 1_000_000_000);
   await sleep(500);
 
   // Deposit into treasury

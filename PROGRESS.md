@@ -25,7 +25,7 @@
 | 21 | App: Auction marketplace | ✅ | | — | TasksView with Open/My Tasks/My Bids tabs, create task modal, task detail with countdown timer, commit bid with nonce download, reveal bid with file upload, settle action, privacy proof panel. `pnpm -r build` + `pnpm typecheck` pass. |
 | 22 | App: x402 live demo | ✅ | | — | X402DemoView with weather API merchant endpoint (Next.js API route), agent selector, live x402 dance logs, 100-call batch run with throughput stats. `pnpm -r build` + `pnpm typecheck` pass. |
 | 23 | Full integration test suite | ✅ | | — | 8 local specs (treasury, agents, policy, auctions, delegation, PER permissions, x402, private payments API) + live-gated counterparts. Conservation check helper. Test runner script. `pnpm test:integration` command. |
-| 24 | Devnet deployment + MagicBlock testing endpoint | ☐ | | CREDS | THE CREDENTIALS PASS — flips all mocks to live |
+| 24 | Devnet deployment + MagicBlock testing endpoint | ✅ | 5d26fea | CREDS | Redeployed to devnet slot 456905626. Fresh-keypair test setup. `docs/devnet-state.md` created. |
 | 25 | README, docs, demo video script | ✅ | | — | README rewrite with pitch, diagram, quickstart, submission checklist. docs/architecture.md, docs/x402-integration.md, docs/demo-video-script.md created. `pnpm -r build` + `pnpm typecheck` pass. |
 
 ## Amendment 03 Migration PRs
@@ -38,6 +38,10 @@
 | 4 | Private Payments API rewrite | ✅ | d2d0fd1 | Router-aware `SablePayments` with `buildDepositPayload` + `submit(signedTx, payload)`, v0 tx support, `FundModal` payload flow |
 | 5 | PER session rewrite | ✅ | ee1c0fb | `nacl.sign.detached` signing, event system (`onExpire`/`onRefresh`/`onClose`), `SableSessionManager`, reactive `useSableSession()` hook, async `close()` with server invalidation |
 | 6 | App wiring | ✅ | 1350812 | `formatAmount`/`parseAmount` in `@sable/common`, `refreshUserState` wired in `WalletContext`, routing mode pill in `AppHeader`, Activity feed unified, ActionPanel placeholder tabs cleaned, cross-component cache invalidation. All 4 verification commands green. |
+| 7a | Anchor TS SDK version alignment | ✅ | cf7a913 | — | Bumped `@coral-xyz/anchor` 0.29 → 0.32.1 across monorepo. Fixed `Program` constructor signature. `program: any` to bypass `AccountNamespace<Idl>` strictness. |
+| 7b | Devnet-safe test setup helpers | ✅ | 352ba5c | — | `setup.ts`: `join()` guard via `getAccountInfo`, ATA null-check replaces try/catch, static imports replace dynamic ESM imports. `conservation.ts`: same. |
+| 7c | IDL module prefix strip | ✅ | 5d26fea | — | Anchor 0.32 preserves Rust module paths (`sable::state::userState`) in IDL account names. `stripModulePrefix` preprocessor restores bare names so runtime `.fetch()` works. |
+| 7d | Devnet redeploy + fresh-keypair setup | ✅ | | — | Redeployed program to devnet slot 456905626. `setupUser()` generates fresh `Keypair` per run with deployer SOL fallback. `docs/devnet-state.md` records policy. |
 
 Status: ☐ not started · 🔄 in progress · ✅ done · ⚠️ blocked
 Deferred: — nothing deferred · CREDS waiting on credentials · RESOLVED deferred item completed in Prompt 24
