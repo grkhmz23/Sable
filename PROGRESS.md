@@ -24,7 +24,7 @@
 | 20 | App: Agent dashboard | ✅ | | — | AgentsView with tree hierarchy, detail pane (balances, policy, actions), spawn modal with keypair generation/download, policy editor with live preview, fund/defund modals. `pnpm -r build` + `pnpm typecheck` pass. |
 | 21 | App: Auction marketplace | ✅ | | — | TasksView with Open/My Tasks/My Bids tabs, create task modal, task detail with countdown timer, commit bid with nonce download, reveal bid with file upload, settle action, privacy proof panel. `pnpm -r build` + `pnpm typecheck` pass. |
 | 22 | App: x402 live demo | ✅ | | — | X402DemoView with weather API merchant endpoint (Next.js API route), agent selector, live x402 dance logs, 100-call batch run with throughput stats. `pnpm -r build` + `pnpm typecheck` pass. |
-| 23 | Full integration test suite | ☐ | | — | |
+| 23 | Full integration test suite | ✅ | | — | 8 local specs (treasury, agents, policy, auctions, delegation, PER permissions, x402, private payments API) + live-gated counterparts. Conservation check helper. Test runner script. `pnpm test:integration` command. |
 | 24 | Devnet deployment + MagicBlock testing endpoint | ☐ | | — | THE CREDENTIALS PASS — flips all mocks to live |
 | 25 | README, docs, demo video script | ☐ | | — | |
 
