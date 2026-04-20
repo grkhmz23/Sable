@@ -5,6 +5,7 @@ import { useWalletContext } from '@/contexts/WalletContext';
 import { useWallet } from '@solana/wallet-adapter-react';
 import { PublicKey } from '@solana/web3.js';
 import { WSOL_MINT } from '@sable/sdk';
+import { env } from '@/utils/env';
 import {
   GlassPanel,
   LuxuryButton,
@@ -22,6 +23,7 @@ interface BalanceInfo {
   version: string;
   isWsol: boolean;
   isDelegated?: boolean;
+  isPrivate?: boolean;
 }
 
 export function BalanceList() {
@@ -31,6 +33,7 @@ export function BalanceList() {
   const [newMint, setNewMint] = useState('');
   const [isLoading, setIsLoading] = useState(false);
   const [isRefreshing, setIsRefreshing] = useState(false);
+  const [isUnlocking, setIsUnlocking] = useState(false);
 
   const fetchBalances = useCallback(async () => {
     if (!sdk || !publicKey) return;
@@ -60,6 +63,31 @@ export function BalanceList() {
 
         baseList.forEach((row, idx) => {
           row.isDelegated = delegatedFlags[idx];
+        });
+      }
+
+      // For delegated balances, try to read via session if available
+      if (sdk.session) {
+        for (const row of baseList) {
+          if (row.isDelegated && row.pubkey) {
+            try {
+              const sessionAmount = await sdk.session.getBalance(row.pubkey);
+              row.amount = sessionAmount.toString();
+              row.isPrivate = false;
+            } catch (err: any) {
+              if (err.name === 'SessionExpiredError') {
+                row.isPrivate = true;
+              } else {
+                row.isPrivate = true;
+              }
+            }
+          } else if (row.isDelegated && !sdk.session) {
+            row.isPrivate = true;
+          }
+        }
+      } else {
+        baseList.forEach((row) => {
+          if (row.isDelegated) row.isPrivate = true;
         });
       }
 
@@ -100,12 +128,41 @@ export function BalanceList() {
     }
   };
 
+  const handleUnlock = async (balancePda: PublicKey) => {
+    if (!sdk || !publicKey) return;
+
+    const perMockUrl = env.PER_MOCK_URL;
+    if (!perMockUrl) {
+      toast.error('PER middleware URL not configured. Set NEXT_PUBLIC_SABLE_PER_MOCK_URL.');
+      return;
+    }
+
+    setIsUnlocking(true);
+    try {
+      await sdk.openSession(perMockUrl, 3600);
+      toast.success('Session opened — private balances unlocked');
+      await fetchBalances();
+    } catch (error: any) {
+      console.error('Session open error:', error);
+      toast.error(error.message || 'Failed to open PER session');
+    } finally {
+      setIsUnlocking(false);
+    }
+  };
+
   const formatAmount = (amount: string, decimals = 9) => {
     const raw = Number(amount);
     if (!Number.isFinite(raw)) return amount;
     return (raw / Math.pow(10, decimals)).toLocaleString(undefined, {
       maximumFractionDigits: 9,
     });
+  };
+
+  const getMintDecimals = (mint: PublicKey) => {
+    // Common devnet mints — expand as needed
+    const usdcDevnet = '4zMMC9srt5Ri5X14GAgXhaHii3GnPAEERYPJgZJDncDU';
+    if (mint.toBase58() === usdcDevnet) return 6;
+    return 9; // Default to 9 (wSOL, most SPL)
   };
 
   return (
@@ -197,8 +254,24 @@ export function BalanceList() {
                   </div>
 
                   <div className="text-left sm:text-right">
-                    <p className="text-lg text-white">{formatAmount(balance.amount)}</p>
-                    <p className="font-mono text-xs text-zinc-500">{balance.amount} raw</p>
+                    {balance.isPrivate ? (
+                      <button
+                        type="button"
+                        onClick={() => balance.pubkey && handleUnlock(balance.pubkey)}
+                        disabled={isUnlocking}
+                        className="inline-flex items-center gap-2 rounded-full border border-amber-300/20 bg-amber-300/5 px-3 py-1.5 text-sm text-amber-100 transition hover:bg-amber-300/10 disabled:opacity-50"
+                      >
+                        <span>🔒</span>
+                        <span>Tap to unlock</span>
+                      </button>
+                    ) : (
+                      <>
+                        <p className="text-lg text-white">
+                          {formatAmount(balance.amount, getMintDecimals(balance.mint))}
+                        </p>
+                        <p className="font-mono text-xs text-zinc-500">{balance.amount} raw</p>
+                      </>
+                    )}
                   </div>
                 </div>
               </div>

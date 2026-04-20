@@ -20,7 +20,7 @@
 | 16 | SDK: Private Payments API adapter | ✅ | | CREDS | Mock server + SDK adapter built. Live test DEFERRED TO CREDENTIALS PASS. |
 | 17 | x402 facilitator service | ✅ | | — | Service + client + middleware + e2e test. Skips gracefully when local validator offline. |
 | 18 | App rebrand + delete old wallet-centric UI | ✅ | 53b5125 | — | Rebranded landing page, created /app treasury dashboard with sidebar nav, skeleton pages for /app/agents, /app/tasks, /app/x402, /app/settings. ActionPanel tabs replaced with Treasury/Agents/Tasks/Activity. No remaining L2 references in UI. `pnpm app:dev` runs, all routes render without errors. |
-| 19 | App: Treasury console | ☐ | | — | |
+| 19 | App: Treasury console | ✅ | | — | TreasuryView with FundModal (AML + buildDeposit), session-gated BalanceList, ActivityFeed with 10s polling, delegation/auto-session flows. `pnpm app:dev` builds clean. Devnet + live payments verification DEFERRED TO CREDENTIALS PASS. |
 | 20 | App: Agent dashboard | ☐ | | — | |
 | 21 | App: Auction marketplace | ☐ | | — | |
 | 22 | App: x402 live demo | ☐ | | — | |

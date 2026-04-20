@@ -67,11 +67,11 @@ export class SableClient {
     // Initialize payments adapter from env if available
     const paymentsApiUrl =
       typeof process !== 'undefined'
-        ? (process.env.SABLE_PRIVATE_PAYMENTS_API_URL || '')
+        ? (process.env.SABLE_PRIVATE_PAYMENTS_API_URL || process.env.NEXT_PUBLIC_SABLE_PRIVATE_PAYMENTS_API_URL || '')
         : '';
     const paymentsApiKey =
       typeof process !== 'undefined'
-        ? (process.env.SABLE_PRIVATE_PAYMENTS_API_KEY || undefined)
+        ? (process.env.SABLE_PRIVATE_PAYMENTS_API_KEY || process.env.NEXT_PUBLIC_SABLE_PRIVATE_PAYMENTS_API_KEY || undefined)
         : undefined;
 
     if (paymentsApiUrl) {

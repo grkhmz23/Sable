@@ -8,6 +8,9 @@ export interface EnvConfig {
   MAGICBLOCK_RPC_URL: string | null;
   MAGIC_ROUTER_URL: string | null;
   SABLE_PROGRAM_ID: string;
+  PRIVATE_PAYMENTS_API_URL: string | null;
+  PRIVATE_PAYMENTS_API_KEY: string | null;
+  PER_MOCK_URL: string | null;
 }
 
 // IMPORTANT: use direct process.env access so Next.js can inline NEXT_PUBLIC_* values
@@ -17,6 +20,9 @@ const SOLANA_RPC_URL_ENV = process.env.NEXT_PUBLIC_SOLANA_RPC_URL;
 const MAGICBLOCK_RPC_URL_ENV = process.env.NEXT_PUBLIC_MAGICBLOCK_RPC_URL;
 const MAGIC_ROUTER_URL_ENV = process.env.NEXT_PUBLIC_MAGIC_ROUTER_URL;
 const PROGRAM_ID_ENV = process.env.NEXT_PUBLIC_SABLE_PROGRAM_ID;
+const PRIVATE_PAYMENTS_API_URL_ENV = process.env.NEXT_PUBLIC_SABLE_PRIVATE_PAYMENTS_API_URL;
+const PRIVATE_PAYMENTS_API_KEY_ENV = process.env.NEXT_PUBLIC_SABLE_PRIVATE_PAYMENTS_API_KEY;
+const PER_MOCK_URL_ENV = process.env.NEXT_PUBLIC_SABLE_PER_MOCK_URL;
 
 export const env: EnvConfig = {
   SOLANA_RPC_URL: SOLANA_RPC_URL_ENV || 'http://127.0.0.1:8899',
@@ -24,6 +30,9 @@ export const env: EnvConfig = {
   MAGIC_ROUTER_URL: MAGIC_ROUTER_URL_ENV || null,
   SABLE_PROGRAM_ID:
     PROGRAM_ID_ENV || 'SaSAXcdWhyr1KD8TKRg6K7WPuxcPLZJHKEwsjQgL5Di',
+  PRIVATE_PAYMENTS_API_URL: PRIVATE_PAYMENTS_API_URL_ENV || null,
+  PRIVATE_PAYMENTS_API_KEY: PRIVATE_PAYMENTS_API_KEY_ENV || null,
+  PER_MOCK_URL: PER_MOCK_URL_ENV || null,
 };
 
 // Validate that program ID is a valid public key (skip pending value)
