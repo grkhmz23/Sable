@@ -1,4 +1,5 @@
 import { BN } from '@coral-xyz/anchor';
+import { TOKEN_PROGRAM_ID } from '@solana/spl-token';
 import { ensureSdk, getPda, PROGRAM_ID } from './setup';
 
 export async function checkConservation(): Promise<void> {
@@ -27,7 +28,7 @@ export async function checkConservation(): Promise<void> {
   // Fetch vault ATAs
   const vaultAuthority = getPda().deriveVaultAuthority()[0];
   const tokenAccounts = await connection.getParsedTokenAccountsByOwner(vaultAuthority, {
-    programId: new (await import('@solana/spl-token')).TOKEN_PROGRAM_ID,
+    programId: TOKEN_PROGRAM_ID,
   });
 
   let vaultTotal = new BN(0);

@@ -1,4 +1,4 @@
-import { Connection, Keypair, PublicKey, LAMPORTS_PER_SOL } from '@solana/web3.js';
+import { Connection, Keypair, PublicKey, LAMPORTS_PER_SOL, Transaction, sendAndConfirmTransaction } from '@solana/web3.js';
 import { BN } from '@coral-xyz/anchor';
 import { getAssociatedTokenAddressSync, createMint, mintTo, createAssociatedTokenAccountInstruction, getOrCreateAssociatedTokenAccount } from '@solana/spl-token';
 import { SableClient } from '@sable/sdk';
@@ -96,46 +96,30 @@ export async function setupUser(): Promise<{ sdk: SableClient; wallet: Keypair; 
   const mint = await getMint();
 
   // Ensure user is joined
-  try {
-    const userState = await sdk.getUserState(wallet.publicKey);
-    if (!userState) {
-      await sdk.join();
-      await sleep(500);
-    }
-  } catch {
+  const userStatePda = sdk.pda.deriveUserState(wallet.publicKey)[0];
+  const existingUserState = await getConnection().getAccountInfo(userStatePda);
+  if (!existingUserState) {
     await sdk.join();
     await sleep(500);
   }
 
   // Ensure mint balance exists
-  try {
-    const bal = await sdk.getUserBalance(wallet.publicKey, mint);
-    if (!bal) {
-      await sdk.addMint(mint);
-      await sleep(500);
-    }
-  } catch {
+  const bal = await sdk.getUserBalance(wallet.publicKey, mint);
+  if (!bal) {
     await sdk.addMint(mint);
     await sleep(500);
   }
 
-  // Ensure vault ATA exists and mint some tokens
-  const vaultAta = getAssociatedTokenAddressSync(mint, getPda().deriveVaultAuthority()[0], true);
-  try {
-    await getConnection().getAccountInfo(vaultAta);
-  } catch {
-    // ATA might not exist, deposit will create it
-  }
+  // Vault ATA is created on-demand by deposit (init_if_needed)
 
   // Mint tokens to wallet ATA then deposit
   const walletAta = getAssociatedTokenAddressSync(mint, wallet.publicKey);
-  try {
-    await getConnection().getAccountInfo(walletAta);
-  } catch {
-    const tx = new (await import('@solana/web3.js')).Transaction().add(
+  const walletAtaInfo = await getConnection().getAccountInfo(walletAta);
+  if (!walletAtaInfo) {
+    const tx = new Transaction().add(
       createAssociatedTokenAccountInstruction(wallet.publicKey, walletAta, wallet.publicKey, mint)
     );
-    await getConnection().sendAndConfirmTransaction(tx, [wallet]);
+    await sendAndConfirmTransaction(getConnection(), tx, [wallet]);
   }
 
   await mintTo(getConnection(), wallet, mint, walletAta, wallet.publicKey, 1_000_000_000);
