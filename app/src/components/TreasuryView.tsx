@@ -140,7 +140,7 @@ export function TreasuryView() {
 
       // Close session first
       if (sdk) {
-        sdk.closeSession();
+        await sdk.closeSession();
       }
 
       const result = await l1Sdk.commitAndUndelegate({ mintList: uniqueMints });

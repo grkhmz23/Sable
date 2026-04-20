@@ -120,12 +120,11 @@ pub fn fund_agent(ctx: Context<FundAgent>, amount: u64) -> Result<()> {
             &[ctx.bumps.agent_balance],
         ]];
         crate::permission_cpi::create_permission(
-            &ctx.accounts.permission_program,
+            &ctx.accounts.permission_program.to_account_info(),
             &ctx.accounts.agent_balance.to_account_info(),
-            &ctx.accounts.permission,
+            &ctx.accounts.permission.to_account_info(),
             &ctx.accounts.root_owner.to_account_info(),
             &ctx.accounts.system_program.to_account_info(),
-            ctx.accounts.root_owner.key(),
             signer_seeds,
         )?;
     }

@@ -1,11 +1,12 @@
 'use client';
 
 import { useWallet } from '@solana/wallet-adapter-react';
-import { WalletMultiButton } from '@/contexts/WalletContext';
+import { WalletMultiButton, useWalletContext } from '@/contexts/WalletContext';
 import { Pill, truncateAddress } from '@/components/ui/luxury';
 
 export function AppHeader() {
   const { connected, publicKey } = useWallet();
+  const { routingMode, setRoutingMode } = useWalletContext();
 
   return (
     <header className="flex items-center justify-between gap-4 px-6 py-4 lg:px-8">
@@ -18,7 +19,36 @@ export function AppHeader() {
         </div>
       </div>
 
-      <div className="hidden lg:block" />
+      <div className="hidden items-center gap-3 lg:flex">
+        {/* Routing mode toggle */}
+        <div className="inline-flex items-center rounded-full border border-white/10 bg-white/[0.03] p-0.5">
+          <button
+            onClick={() => setRoutingMode('solana')}
+            className={`rounded-full px-3 py-1 text-xs font-medium transition-colors ${
+              routingMode === 'solana'
+                ? 'bg-white/10 text-amber-100'
+                : 'text-zinc-400 hover:text-zinc-200'
+            }`}
+            title="Use Solana base layer RPC"
+          >
+            L1
+          </button>
+          <button
+            onClick={() => setRoutingMode('er')}
+            className={`rounded-full px-3 py-1 text-xs font-medium transition-colors ${
+              routingMode === 'er'
+                ? 'bg-white/10 text-amber-100'
+                : 'text-zinc-400 hover:text-zinc-200'
+            }`}
+            title="Use Magic Router (auto-routes to ER validator)"
+          >
+            ER
+          </button>
+        </div>
+        {routingMode === 'er' && (
+          <span className="text-[10px] text-zinc-500">Magic Router</span>
+        )}
+      </div>
 
       <div className="flex items-center gap-3">
         <Pill tone="amber">Devnet</Pill>

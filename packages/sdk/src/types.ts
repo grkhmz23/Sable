@@ -18,12 +18,39 @@ export interface BatchTransferInput {
 export interface SdkConfig {
   programId?: PublicKey;
   connection: Connection;
+  /** Magic Router connection for ER-bound transactions */
+  routerConnection?: Connection;
   wallet?: {
     publicKey: PublicKey;
     signTransaction: any;
     signAllTransactions: any;
     signMessage?: (message: Uint8Array) => Promise<Uint8Array>;
   };
+}
+
+export interface SendTransactionOpts {
+  /** Use Magic Router to fetch ER-valid blockhash and submit tx */
+  useRouter?: boolean;
+  /** Delegated accounts in this transaction (required when useRouter=true) */
+  delegatedAccounts?: PublicKey[];
+}
+
+export interface RouterDelegationStatus {
+  isDelegated: boolean;
+  fqdn?: string;
+  delegationRecord?: {
+    authority: string;
+    owner: string;
+    delegationSlot: number;
+    lamports: number;
+  };
+}
+
+export interface ErRoute {
+  identity: string;
+  fqdn: string;
+  countryCode: string;
+  blockTime: number;
 }
 
 export interface DepositParams {
@@ -61,6 +88,8 @@ export interface DelegationStatus {
 export interface TransactionResult {
   signature: TransactionSignature;
   confirmation?: any;
+  /** ER blockhash used when transaction was routed through Magic Router */
+  erBlockhash?: string;
 }
 
 export interface PdaDerivations {

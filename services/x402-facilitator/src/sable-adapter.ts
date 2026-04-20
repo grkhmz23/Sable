@@ -11,6 +11,8 @@ import { decodePaymentHeader, type PaymentPayload } from './protocol';
 
 export interface SableAdapterConfig {
   connection: Connection;
+  /** Magic Router connection for ER-bound settlements */
+  routerConnection?: Connection;
   /** Minimum price in base units (e.g., USDC lamports) */
   minPrice?: BN;
   /** Expected receiver pubkey for validation */
@@ -35,6 +37,7 @@ export interface SettlementResult {
 
 export class SableAdapter {
   private connection: Connection;
+  private routerConnection?: Connection;
   private minPrice: BN;
   private expectedReceiver?: PublicKey;
   private expectedMint?: PublicKey;
@@ -43,6 +46,7 @@ export class SableAdapter {
 
   constructor(config: SableAdapterConfig) {
     this.connection = config.connection;
+    this.routerConnection = config.routerConnection;
     this.minPrice = config.minPrice || new BN(0);
     this.expectedReceiver = config.expectedReceiver;
     this.expectedMint = config.expectedMint;
@@ -134,7 +138,12 @@ export class SableAdapter {
 
     try {
       const rawTx = tx.serialize();
-      const signature = await this.connection.sendRawTransaction(rawTx, {
+
+      // Use router connection if available for ER-bound settlements,
+      // otherwise fall back to base connection.
+      const connection = this.routerConnection || this.connection;
+
+      const signature = await connection.sendRawTransaction(rawTx, {
         skipPreflight: false,
         preflightCommitment: 'confirmed',
       });

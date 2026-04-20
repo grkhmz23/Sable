@@ -13,6 +13,7 @@
 
 import { Keypair, PublicKey } from '@solana/web3.js';
 import { BN } from '@coral-xyz/anchor';
+import nacl from 'tweetnacl';
 
 export class SessionExpiredError extends Error {
   constructor(message = 'PER session expired') {
@@ -39,23 +40,77 @@ export interface SableSessionConfig {
   ttlSeconds?: number;
 }
 
+export interface SessionEventMap {
+  expire: [];
+  refresh: [SableSession];
+  close: [];
+}
+
+export type SessionEventCallback<K extends keyof SessionEventMap> = (
+  ...args: SessionEventMap[K]
+) => void;
+
+type AnySessionEventCallback = SessionEventCallback<keyof SessionEventMap>;
+
 export class SableSession {
   /** Ephemeral session keypair issued by PER middleware */
   sessionKey: Keypair;
   /** Session expiry timestamp (unix seconds) */
   expiry: number;
-  /** PER middleware endpoint URL */
+  /** PER middleware HTTP endpoint URL */
   perEndpoint: string;
+  /** PER middleware WebSocket endpoint URL (optional) */
+  perWsEndpoint?: string;
 
-  constructor(sessionKey: Keypair, expiry: number, perEndpoint: string) {
+  private eventListeners: Partial<Record<keyof SessionEventMap, Set<AnySessionEventCallback>>> = {};
+  private closed = false;
+
+  constructor(
+    sessionKey: Keypair,
+    expiry: number,
+    perEndpoint: string,
+    perWsEndpoint?: string
+  ) {
     this.sessionKey = sessionKey;
     this.expiry = expiry;
     this.perEndpoint = perEndpoint;
+    this.perWsEndpoint = perWsEndpoint;
   }
 
   /** Check if the session is expired */
   get isExpired(): boolean {
-    return Math.floor(Date.now() / 1000) >= this.expiry;
+    return this.closed || Math.floor(Date.now() / 1000) >= this.expiry;
+  }
+
+  /** Time remaining in seconds (0 if expired) */
+  get timeRemaining(): number {
+    const remaining = this.expiry - Math.floor(Date.now() / 1000);
+    return Math.max(0, remaining);
+  }
+
+  private emit<K extends keyof SessionEventMap>(event: K, ...args: SessionEventMap[K]) {
+    const listeners = this.eventListeners[event] as Set<AnySessionEventCallback> | undefined;
+    listeners?.forEach((cb) => {
+      try {
+        (cb as SessionEventCallback<K>)(...args);
+      } catch {
+        // ignore listener errors
+      }
+    });
+  }
+
+  on<K extends keyof SessionEventMap>(event: K, callback: SessionEventCallback<K>): () => void {
+    if (!this.eventListeners[event]) {
+      this.eventListeners[event] = new Set();
+    }
+    (this.eventListeners[event] as Set<AnySessionEventCallback>).add(callback as AnySessionEventCallback);
+    return () => {
+      (this.eventListeners[event] as Set<AnySessionEventCallback>).delete(callback as AnySessionEventCallback);
+    };
+  }
+
+  off<K extends keyof SessionEventMap>(event: K, callback: SessionEventCallback<K>): void {
+    (this.eventListeners[event] as Set<AnySessionEventCallback> | undefined)?.delete(callback as AnySessionEventCallback);
   }
 
   /**
@@ -76,12 +131,12 @@ export class SableSession {
       `${perRpcUrl}/challenge?pubkey=${encodeURIComponent(pubkey)}`
     );
     if (!challengeRes.ok) {
-      const err = await challengeRes.json().catch(() => ({})) as any;
+      const err = (await challengeRes.json().catch(() => ({}))) as any;
       throw new UnauthorizedError(
         `Challenge failed: ${err.error || challengeRes.statusText}`
       );
     }
-    const { challenge } = await challengeRes.json() as any;
+    const { challenge } = (await challengeRes.json()) as any;
 
     // 2. Sign challenge
     const challengeBytes = Buffer.from(challenge, 'base64');
@@ -100,7 +155,7 @@ export class SableSession {
     });
 
     if (!sessionRes.ok) {
-      const err = await sessionRes.json().catch(() => ({})) as any;
+      const err = (await sessionRes.json().catch(() => ({}))) as any;
       throw new UnauthorizedError(
         `Session creation failed: ${err.error || sessionRes.statusText}`
       );
@@ -110,11 +165,13 @@ export class SableSession {
       sessionPubkey,
       sessionSecret,
       expiry,
+      wsEndpoint,
     }: {
       sessionPubkey: string;
       sessionSecret: string;
       expiry: number;
-    } = await sessionRes.json() as any;
+      wsEndpoint?: string;
+    } = (await sessionRes.json()) as any;
 
     const secretBytes = Buffer.from(sessionSecret, 'base64');
     const sessionKey = Keypair.fromSecretKey(secretBytes);
@@ -124,7 +181,53 @@ export class SableSession {
       throw new UnauthorizedError('Session pubkey mismatch from middleware');
     }
 
-    return new SableSession(sessionKey, expiry, perRpcUrl);
+    return new SableSession(sessionKey, expiry, perRpcUrl, wsEndpoint);
+  }
+
+  /**
+   * Refresh the session before it expires.
+   * Proactively exchanges the current session for a new one with extended TTL.
+   * Emits 'refresh' event on success, 'expire' on failure.
+   */
+  async refresh(signer: SessionSigner, ttlSeconds = 3600): Promise<SableSession> {
+    if (this.closed) {
+      throw new SessionExpiredError('Session has been closed');
+    }
+
+    try {
+      const fresh = await SableSession.openSession({
+        signer,
+        perRpcUrl: this.perEndpoint,
+        ttlSeconds,
+      });
+
+      // Copy WS endpoint if server didn't return a new one
+      if (!fresh.perWsEndpoint && this.perWsEndpoint) {
+        fresh.perWsEndpoint = this.perWsEndpoint;
+      }
+
+      // Wipe old key
+      this.sessionKey.secretKey.fill(0);
+
+      // Update self in-place so existing references stay valid
+      this.sessionKey = fresh.sessionKey;
+      this.expiry = fresh.expiry;
+      this.perWsEndpoint = fresh.perWsEndpoint;
+      this.closed = false;
+
+      this.emit('refresh', this);
+      return this;
+    } catch (err) {
+      this.emit('expire');
+      throw err;
+    }
+  }
+
+  /**
+   * Sign data with the session key using Ed25519.
+   */
+  private sign(data: Uint8Array): Uint8Array {
+    return nacl.sign.detached(data, this.sessionKey.secretKey);
   }
 
   /**
@@ -141,24 +244,22 @@ export class SableSession {
     const session = this.sessionKey.publicKey.toBase58();
 
     // Sign account pubkey with session key
-    const signature = Buffer.from(
-      (this.sessionKey as any).sign(balancePda.toBytes())
-    ).toString('base64');
+    const signature = Buffer.from(this.sign(balancePda.toBytes())).toString('base64');
 
     const res = await fetch(
       `${this.perEndpoint}/balance?account=${encodeURIComponent(account)}&session=${encodeURIComponent(session)}&signature=${encodeURIComponent(signature)}`
     );
 
     if (res.status === 401) {
-      const err = await res.json().catch(() => ({})) as any;
+      const err = (await res.json().catch(() => ({}))) as any;
       throw new UnauthorizedError(err.error || 'Unauthorized');
     }
     if (!res.ok) {
-      const err = await res.json().catch(() => ({})) as any;
+      const err = (await res.json().catch(() => ({}))) as any;
       throw new Error(`Balance read failed: ${err.error || res.statusText}`);
     }
 
-    const { balance }: { balance: string } = await res.json() as any;
+    const { balance }: { balance: string } = (await res.json()) as any;
     return new BN(balance);
   }
 
@@ -171,14 +272,47 @@ export class SableSession {
   }
 
   /**
-   * Close the session (client-side only — memory is cleared).
-   * The server-side session still expires naturally.
+   * Build the WebSocket URL for streaming PER reads.
+   * If the server provided a wsEndpoint during session creation, uses that.
+   * Otherwise derives from the HTTP endpoint.
    */
-  close(): void {
+  getWebSocketUrl(token?: string): string {
+    let base = this.perWsEndpoint;
+    if (!base) {
+      // Derive WS from HTTP endpoint (replace http/https with ws/wss)
+      base = this.perEndpoint.replace(/^http/, 'ws');
+    }
+    if (token) {
+      const sep = base.includes('?') ? '&' : '?';
+      return `${base}${sep}token=${encodeURIComponent(token)}`;
+    }
+    return base;
+  }
+
+  /**
+   * Close the session client-side and notify the server.
+   * After calling close(), all reads will throw SessionExpiredError.
+   */
+  async close(): Promise<void> {
+    if (this.closed) return;
+
+    // Notify server (best-effort)
+    try {
+      await fetch(`${this.perEndpoint}/session`, {
+        method: 'DELETE',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          session: this.sessionKey.publicKey.toBase58(),
+        }),
+      });
+    } catch {
+      // Server may not support DELETE /session; ignore
+    }
+
     // Overwrite secret key bytes in memory
     this.sessionKey.secretKey.fill(0);
-    (this.sessionKey as any)._keypair?.secretKey?.fill(0);
     this.expiry = 0;
+    this.closed = true;
+    this.emit('close');
   }
 }
-

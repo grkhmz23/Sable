@@ -817,6 +817,14 @@ function AgentsTab() {
         eyebrow="Agent Overview"
         title="Your Agents"
         subtitle="Hierarchical agents spawned from your treasury. Each agent has its own balance, policy, and counters."
+        action={
+          <a
+            href="/app/agents"
+            className="text-xs text-amber-200/80 hover:text-amber-100 underline underline-offset-2"
+          >
+            View all →
+          </a>
+        }
       />
 
       {loading ? (
@@ -889,6 +897,14 @@ function TasksTab() {
         eyebrow="Auction Overview"
         title="Your Tasks"
         subtitle="Sealed-bid tasks posted by you or your agents. Tasks progress through Open → Revealing → Settled states."
+        action={
+          <a
+            href="/app/tasks"
+            className="text-xs text-amber-200/80 hover:text-amber-100 underline underline-offset-2"
+          >
+            View all →
+          </a>
+        }
       />
 
       {loading ? (
@@ -947,18 +963,24 @@ function ActivityTab() {
         {publicKey ? (
           <div className="space-y-4">
             <div className="flex items-center gap-3">
-              <div className="h-2 w-2 rounded-full bg-zinc-600" />
+              <div className="h-2 w-2 rounded-full bg-emerald-400" />
               <div>
-                <p className="text-sm text-zinc-300">Activity feed</p>
+                <p className="text-sm text-zinc-300">Live activity feed</p>
                 <p className="text-xs text-zinc-500">
                   Connected: {truncateAddress(publicKey.toBase58(), 14, 14)}
                 </p>
               </div>
             </div>
             <p className="text-xs text-zinc-500">
-              Transaction history will be available once the indexer integration is complete.
-              For now, check the Solana Explorer for on-chain activity.
+              The activity feed is displayed on the Treasury page. It polls on-chain signatures
+              every 10 seconds to show recent deposits, transfers, and delegation events.
             </p>
+            <a
+              href="/app"
+              className="inline-block text-xs text-amber-200/80 hover:text-amber-100 underline underline-offset-2"
+            >
+              Go to Treasury →
+            </a>
           </div>
         ) : (
           <p className="text-sm text-zinc-400">Connect your wallet to view activity.</p>

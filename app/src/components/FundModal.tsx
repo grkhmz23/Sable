@@ -69,15 +69,18 @@ export function FundModal({ isOpen, onClose, onComplete }: FundModalProps) {
       }
 
       // Build deposit tx via Private Payments API
-      const tx = await sdk.payments.buildDeposit({
+      const { tx, payload } = await sdk.payments.buildDepositPayload({
         from: publicKey,
         amount: new BN(lamports),
       });
 
-      // Sign and send
-      const result = await sdk.sendTransaction(tx);
+      // Sign the transaction
+      const signed = await sdk.config.wallet!.signTransaction(tx as any);
+
+      // Submit via the correct route (base or ephemeral)
+      const result = await sdk.payments.submit(signed, payload, sdk.config.connection);
       toast.success(`Funded ${amount} USDC successfully`);
-      console.log('Fund transaction:', result.signature);
+      console.log('Fund transaction:', result.signature, 'routed to:', result.sendTo);
       setAmount('');
       setAmlStatus('idle');
       onComplete?.();

@@ -151,6 +151,9 @@ importers:
       bn.js:
         specifier: ^5.2.1
         version: 5.2.3
+      tweetnacl:
+        specifier: ^1.0.3
+        version: 1.0.3
     devDependencies:
       '@types/bn.js':
         specifier: ^5.1.5

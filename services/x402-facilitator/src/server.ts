@@ -21,13 +21,16 @@ const PORT = process.env.X402_FACILITATOR_PORT
   : 5555;
 
 const SOLANA_RPC = process.env.SOLANA_RPC_URL || 'http://localhost:8899';
+const MAGIC_ROUTER_URL = process.env.MAGIC_ROUTER_URL;
 const MIN_PRICE_USDC = process.env.SABLE_X402_MIN_PRICE_USDC || '10000'; // 0.01 USDC with 6 decimals
 const DEFAULT_RECEIVER = process.env.SABLE_X402_DEFAULT_RECEIVER;
 
 const connection = new Connection(SOLANA_RPC, 'confirmed');
+const routerConnection = MAGIC_ROUTER_URL ? new Connection(MAGIC_ROUTER_URL, 'confirmed') : undefined;
 
 const adapter = new SableAdapter({
   connection,
+  routerConnection,
   minPrice: new BN(MIN_PRICE_USDC),
   expectedReceiver: DEFAULT_RECEIVER ? new PublicKey(DEFAULT_RECEIVER) : undefined,
 });

@@ -12,6 +12,7 @@ import type {
   TransferItem,
   TransactionResult,
   BatchTransferInput,
+  SendTransactionOpts,
 } from './types';
 import { MAX_BATCH_TRANSFER_RECIPIENTS } from './types';
 
@@ -21,7 +22,10 @@ export class TransferModule {
   /**
    * Transfer tokens internally (batch)
    */
-  async transferBatch(params: TransferBatchParams): Promise<TransactionResult> {
+  async transferBatch(
+    params: TransferBatchParams,
+    opts?: SendTransactionOpts
+  ): Promise<TransactionResult> {
     if (!this.client.isConnected) throw new Error('Wallet not connected');
 
     const sender = this.client.walletPublicKey!;
@@ -62,7 +66,7 @@ export class TransferModule {
       .remainingAccounts(remainingAccounts)
       .transaction();
 
-    return this.client.sendTransaction(tx);
+    return this.client.sendTransaction(tx, opts);
   }
 
   /**
@@ -71,7 +75,8 @@ export class TransferModule {
   async transferBatchChunked(
     mint: PublicKey,
     items: TransferItem[],
-    chunkSize: number = MAX_BATCH_TRANSFER_RECIPIENTS
+    chunkSize: number = MAX_BATCH_TRANSFER_RECIPIENTS,
+    opts?: SendTransactionOpts
   ): Promise<TransactionResult[]> {
     const chunks: TransferItem[][] = [];
     for (let i = 0; i < items.length; i += chunkSize) {
@@ -80,7 +85,7 @@ export class TransferModule {
 
     const results: TransactionResult[] = [];
     for (const chunk of chunks) {
-      const result = await this.transferBatch({ mint, items: chunk });
+      const result = await this.transferBatch({ mint, items: chunk }, opts);
       results.push(result);
     }
 
@@ -91,7 +96,10 @@ export class TransferModule {
    * Send tokens externally from the program vault to recipient ATAs.
    * Requires sender accounts to be committed/undelegated on L1.
    */
-  async externalSendBatch(params: TransferBatchParams): Promise<TransactionResult> {
+  async externalSendBatch(
+    params: TransferBatchParams,
+    opts?: SendTransactionOpts
+  ): Promise<TransactionResult> {
     if (!this.client.isConnected) throw new Error('Wallet not connected');
 
     const owner = this.client.walletPublicKey!;
@@ -173,7 +181,7 @@ export class TransferModule {
       .instruction();
 
     tx.add(externalSendIx);
-    return this.client.sendTransaction(tx);
+    return this.client.sendTransaction(tx, opts);
   }
 
   /**
@@ -182,7 +190,8 @@ export class TransferModule {
   async externalSendBatchChunked(
     mint: PublicKey,
     items: TransferItem[],
-    chunkSize: number = MAX_BATCH_TRANSFER_RECIPIENTS
+    chunkSize: number = MAX_BATCH_TRANSFER_RECIPIENTS,
+    opts?: SendTransactionOpts
   ): Promise<TransactionResult[]> {
     if (chunkSize <= 0) {
       throw new Error('chunkSize must be > 0');

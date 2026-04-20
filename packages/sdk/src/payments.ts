@@ -13,7 +13,13 @@
  * For local development, use the mock server in services/payments-api-mock/.
  */
 
-import { PublicKey, Transaction, VersionedTransaction } from '@solana/web3.js';
+import {
+  PublicKey,
+  Transaction,
+  VersionedTransaction,
+  Connection,
+  TransactionSignature,
+} from '@solana/web3.js';
 import { BN } from '@coral-xyz/anchor';
 
 export class AmlRejectedError extends Error {
@@ -44,22 +50,38 @@ export interface UnsignedTransactionPayload {
 export interface SablePaymentsConfig {
   apiUrl: string;
   apiKey?: string;
+  /** Optional Magic Router connection for routing ephemeral transactions */
+  routerConnection?: Connection;
+}
+
+export interface PaymentTransaction {
+  /** The deserialized Solana transaction (legacy or versioned) */
+  tx: Transaction | VersionedTransaction;
+  /** The raw payload from the Private Payments API */
+  payload: UnsignedTransactionPayload;
+}
+
+export interface PaymentSubmissionResult {
+  signature: TransactionSignature;
+  sendTo: 'base' | 'ephemeral';
 }
 
 export class SablePayments {
   private apiUrl: string;
   private apiKey?: string;
+  private routerConnection?: Connection;
 
   constructor(config: SablePaymentsConfig) {
     this.apiUrl = config.apiUrl.replace(/\/$/, '');
     this.apiKey = config.apiKey;
+    this.routerConnection = config.routerConnection;
   }
 
   private async request(path: string, options: RequestInit = {}): Promise<any> {
     const headers: Record<string, string> = {
       'Content-Type': 'application/json',
       ...(this.apiKey ? { 'X-API-Key': this.apiKey } : {}),
-      ...(options.headers as Record<string, string> || {}),
+      ...((options.headers as Record<string, string>) || {}),
     };
 
     const res = await fetch(`${this.apiUrl}${path}`, {
@@ -68,7 +90,7 @@ export class SablePayments {
     });
 
     if (!res.ok) {
-      const body = await res.json().catch(() => ({})) as any;
+      const body = (await res.json().catch(() => ({}))) as any;
       throw new PaymentsApiError(res.status, body.error || res.statusText);
     }
 
@@ -77,23 +99,79 @@ export class SablePayments {
 
   /**
    * Deserialize an unsigned transaction payload into a Solana Transaction.
+   * Supports both legacy and versioned (v0) transactions.
    */
-  private deserializeTx(payload: UnsignedTransactionPayload): Transaction {
+  private deserializeTx(payload: UnsignedTransactionPayload): Transaction | VersionedTransaction {
     const txBytes = Buffer.from(payload.transactionBase64, 'base64');
 
     if (payload.version === 'v0') {
-      const vtx = VersionedTransaction.deserialize(txBytes);
-      // VersionedTransaction cannot be directly converted to Transaction;
-      // callers using v0 should handle it separately. For legacy compatibility
-      // we throw so the error is explicit.
-      throw new PaymentsApiError(500, 'Versioned transactions (v0) are not yet supported by this adapter');
+      return VersionedTransaction.deserialize(txBytes);
     }
 
     return Transaction.from(txBytes);
   }
 
   /**
+   * Submit a signed payment transaction to the correct destination.
+   *
+   * - If `payload.sendTo === 'ephemeral'` and a router connection is configured,
+   *   submits via the Magic Router.
+   * - Otherwise submits via the provided base connection.
+   */
+  async submit(
+    signedTx: Transaction | VersionedTransaction,
+    payload: UnsignedTransactionPayload,
+    baseConnection: Connection
+  ): Promise<PaymentSubmissionResult> {
+    const rawTx = signedTx.serialize();
+    const isEphemeral = payload.sendTo === 'ephemeral';
+    const connection = isEphemeral && this.routerConnection ? this.routerConnection : baseConnection;
+
+    const signature = await connection.sendRawTransaction(rawTx, {
+      skipPreflight: false,
+      preflightCommitment: 'confirmed',
+    });
+
+    // Confirm using the payload's block info
+    await connection.confirmTransaction(
+      {
+        signature,
+        blockhash: payload.recentBlockhash,
+        lastValidBlockHeight: payload.lastValidBlockHeight,
+      },
+      'confirmed'
+    );
+
+    return { signature, sendTo: payload.sendTo };
+  }
+
+  /**
    * Build an unsigned deposit transaction from Solana base layer into an ephemeral rollup.
+   * Returns both the deserialized transaction and the raw payload for routing.
+   */
+  async buildDepositPayload({
+    from,
+    amount,
+    mint,
+  }: {
+    from: PublicKey;
+    amount: BN;
+    mint?: PublicKey;
+  }): Promise<PaymentTransaction> {
+    const payload: UnsignedTransactionPayload = await this.request('/deposit', {
+      method: 'POST',
+      body: JSON.stringify({
+        from: from.toBase58(),
+        amount: amount.toString(),
+        mint: mint?.toBase58(),
+      }),
+    });
+    return { tx: this.deserializeTx(payload), payload };
+  }
+
+  /**
+   * Build an unsigned deposit transaction (legacy API — returns Transaction only).
+   * Use `buildDepositPayload` if you need routing info.
    */
   async buildDeposit({
     from,
@@ -104,19 +182,44 @@ export class SablePayments {
     amount: BN;
     mint?: PublicKey;
   }): Promise<Transaction> {
-    const payload: UnsignedTransactionPayload = await this.request('/deposit', {
-      method: 'POST',
-      body: JSON.stringify({
-        from: from.toBase58(),
-        amount: amount.toString(),
-        mint: mint?.toBase58(),
-      }),
-    });
-    return this.deserializeTx(payload);
+    const { tx } = await this.buildDepositPayload({ from, amount, mint });
+    if (tx instanceof VersionedTransaction) {
+      throw new PaymentsApiError(
+        500,
+        'Versioned transactions (v0) are not supported by this legacy API. Use buildDepositPayload instead.'
+      );
+    }
+    return tx;
   }
 
   /**
    * Build an unsigned SPL transfer transaction.
+   */
+  async buildTransferPayload({
+    from,
+    to,
+    amount,
+    mint,
+  }: {
+    from: PublicKey;
+    to: PublicKey;
+    amount: BN;
+    mint?: PublicKey;
+  }): Promise<PaymentTransaction> {
+    const payload: UnsignedTransactionPayload = await this.request('/transfer', {
+      method: 'POST',
+      body: JSON.stringify({
+        from: from.toBase58(),
+        to: to.toBase58(),
+        amount: amount.toString(),
+        mint: mint?.toBase58(),
+      }),
+    });
+    return { tx: this.deserializeTx(payload), payload };
+  }
+
+  /**
+   * Build an unsigned SPL transfer transaction (legacy API).
    */
   async buildTransfer({
     from,
@@ -129,7 +232,28 @@ export class SablePayments {
     amount: BN;
     mint?: PublicKey;
   }): Promise<Transaction> {
-    const payload: UnsignedTransactionPayload = await this.request('/transfer', {
+    const { tx } = await this.buildTransferPayload({ from, to, amount, mint });
+    if (tx instanceof VersionedTransaction) {
+      throw new PaymentsApiError(500, 'Versioned transactions (v0) not supported by legacy API');
+    }
+    return tx;
+  }
+
+  /**
+   * Build an unsigned withdrawal transaction back to Solana base layer.
+   */
+  async buildWithdrawPayload({
+    from,
+    to,
+    amount,
+    mint,
+  }: {
+    from: PublicKey;
+    to: PublicKey;
+    amount: BN;
+    mint?: PublicKey;
+  }): Promise<PaymentTransaction> {
+    const payload: UnsignedTransactionPayload = await this.request('/withdraw', {
       method: 'POST',
       body: JSON.stringify({
         from: from.toBase58(),
@@ -138,11 +262,11 @@ export class SablePayments {
         mint: mint?.toBase58(),
       }),
     });
-    return this.deserializeTx(payload);
+    return { tx: this.deserializeTx(payload), payload };
   }
 
   /**
-   * Build an unsigned withdrawal transaction back to Solana base layer.
+   * Build an unsigned withdrawal transaction (legacy API).
    */
   async buildWithdraw({
     from,
@@ -155,16 +279,11 @@ export class SablePayments {
     amount: BN;
     mint?: PublicKey;
   }): Promise<Transaction> {
-    const payload: UnsignedTransactionPayload = await this.request('/withdraw', {
-      method: 'POST',
-      body: JSON.stringify({
-        from: from.toBase58(),
-        to: to.toBase58(),
-        amount: amount.toString(),
-        mint: mint?.toBase58(),
-      }),
-    });
-    return this.deserializeTx(payload);
+    const { tx } = await this.buildWithdrawPayload({ from, to, amount, mint });
+    if (tx instanceof VersionedTransaction) {
+      throw new PaymentsApiError(500, 'Versioned transactions (v0) not supported by legacy API');
+    }
+    return tx;
   }
 
   /**
@@ -198,14 +317,25 @@ export class SablePayments {
   /**
    * Build an unsigned transaction that initializes a validator-scoped transfer queue for a mint.
    */
-  async initMint({ mint }: { mint: PublicKey }): Promise<Transaction> {
+  async initMintPayload({ mint }: { mint: PublicKey }): Promise<PaymentTransaction> {
     const payload: UnsignedTransactionPayload = await this.request('/init-mint', {
       method: 'POST',
       body: JSON.stringify({
         mint: mint.toBase58(),
       }),
     });
-    return this.deserializeTx(payload);
+    return { tx: this.deserializeTx(payload), payload };
+  }
+
+  /**
+   * Build an unsigned init-mint transaction (legacy API).
+   */
+  async initMint({ mint }: { mint: PublicKey }): Promise<Transaction> {
+    const { tx } = await this.initMintPayload({ mint });
+    if (tx instanceof VersionedTransaction) {
+      throw new PaymentsApiError(500, 'Versioned transactions (v0) not supported by legacy API');
+    }
+    return tx;
   }
 
   /**

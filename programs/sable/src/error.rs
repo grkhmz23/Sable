@@ -139,4 +139,13 @@ pub enum SableError {
 
     #[msg("Permission metadata initialization failed")]
     PermissionInitFailed,
+
+    #[msg("Invalid delegate buffer PDA")]
+    InvalidBufferPda,
+
+    #[msg("Invalid delegation record PDA")]
+    InvalidRecordPda,
+
+    #[msg("Invalid delegation metadata PDA")]
+    InvalidMetadataPda,
 }

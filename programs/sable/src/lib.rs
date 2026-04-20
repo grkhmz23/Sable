@@ -12,20 +12,10 @@ use anchor_spl::token::{
 use ephemeral_rollups_sdk::anchor::{commit, delegate, ephemeral};
 use ephemeral_rollups_sdk::cpi::{delegate_account, DelegateAccounts, DelegateConfig};
 use ephemeral_rollups_sdk::ephem::commit_and_undelegate_accounts;
-
-pub mod error;
-pub mod events;
-pub mod instructions;
-pub mod policy;
-pub mod state;
-
-use error::*;
-use events::*;
-use instructions::agent::*;
-use instructions::auction::*;
-use state::*;
-
-/// Helper for CPI calls to the MagicBlock PER permission program.
+// Permission CPI helpers — manual implementation because ephemeral-rollups-sdk v0.10.9
+// has a borsh version conflict between its `anchor` and `access-control` features.
+// See docs/magicblock-integration.md for details.
+#[allow(dead_code)]
 mod permission_cpi {
     use super::*;
     use solana_program::{
@@ -37,31 +27,39 @@ mod permission_cpi {
         pubkey!("ACLseoPoyC3cBqoUtkbjZ4aDrkurZW86v19pXz2XQnp1");
     pub const PERMISSION_SEED: &[u8] = b"permission:";
 
-    pub const AUTHORITY_FLAG: u8 = 1 << 0;
-    pub const TX_LOGS_FLAG: u8 = 1 << 1;
-    pub const TX_BALANCES_FLAG: u8 = 1 << 2;
-    pub const TX_MESSAGE_FLAG: u8 = 1 << 3;
-    pub const ACCOUNT_SIGNATURES_FLAG: u8 = 1 << 4;
+    // Discriminators (u64 little-endian)
+    pub const CREATE_PERMISSION_DISCRIMINATOR: [u8; 8] = [0, 0, 0, 0, 0, 0, 0, 0];
+    pub const UPDATE_PERMISSION_DISCRIMINATOR: [u8; 8] = [1, 0, 0, 0, 0, 0, 0, 0];
+    pub const CLOSE_PERMISSION_DISCRIMINATOR: [u8; 8] = [2, 0, 0, 0, 0, 0, 0, 0];
+    pub const DELEGATE_PERMISSION_DISCRIMINATOR: [u8; 8] = [3, 0, 0, 0, 0, 0, 0, 0];
+    pub const COMMIT_AND_UNDELEGATE_PERMISSION_DISCRIMINATOR: [u8; 8] = [5, 0, 0, 0, 0, 0, 0, 0];
 
-    /// CPI call to the permission program's `create_permission` instruction.
-    /// Grants the `authority` full visibility and authority flags over the
-    /// `permissioned_account`.
+    /// Serialize `MembersArgs { members: Some(vec![]) }` (owner-only default)
+    fn serialize_empty_members() -> Vec<u8> {
+        let mut data = Vec::with_capacity(5);
+        data.push(1u8);                    // Option::Some
+        data.extend_from_slice(&0u32.to_le_bytes()); // Vec::len = 0
+        data
+    }
+
+    /// Serialize `MembersArgs { members: None }` (public)
+    fn serialize_none_members() -> Vec<u8> {
+        vec![0u8] // Option::None
+    }
+
     pub fn create_permission<'info>(
         permission_program: &AccountInfo<'info>,
         permissioned_account: &AccountInfo<'info>,
         permission_pda: &AccountInfo<'info>,
         payer: &AccountInfo<'info>,
         system_program: &AccountInfo<'info>,
-        authority: Pubkey,
         signers_seeds: &[&[&[u8]]],
     ) -> Result<()> {
-        // Validate permission program
         require!(
             permission_program.key() == PERMISSION_PROGRAM_ID,
             SableError::InvalidRecipientAccounts
         );
 
-        // Validate permission PDA
         let (expected_permission, _) = Pubkey::find_program_address(
             &[PERMISSION_SEED, permissioned_account.key.as_ref()],
             &PERMISSION_PROGRAM_ID,
@@ -71,21 +69,8 @@ mod permission_cpi {
             SableError::InvalidRecipientAccounts
         );
 
-        // Build instruction data:
-        // discriminator (u64 = 0) + MembersArgs { members: Some(vec![Member]) }
-        let mut data = vec![0u8; 8]; // discriminator
-
-        // Serialize MembersArgs manually (borsh-compatible):
-        // Option::Some = 1u8, Vec<u32> length, Member { flags: u8, pubkey: [u8; 32] }
-        let flags = AUTHORITY_FLAG
-            | TX_LOGS_FLAG
-            | TX_BALANCES_FLAG
-            | TX_MESSAGE_FLAG
-            | ACCOUNT_SIGNATURES_FLAG;
-        data.push(1); // Some variant
-        data.extend_from_slice(&1u32.to_le_bytes()); // vec length = 1
-        data.push(flags);
-        data.extend_from_slice(&authority.to_bytes());
+        let mut data = CREATE_PERMISSION_DISCRIMINATOR.to_vec();
+        data.extend_from_slice(&serialize_empty_members());
 
         let instruction = Instruction {
             program_id: PERMISSION_PROGRAM_ID,
@@ -111,7 +96,207 @@ mod permission_cpi {
 
         Ok(())
     }
+
+    pub fn update_permission<'info>(
+        permission_program: &AccountInfo<'info>,
+        authority: &AccountInfo<'info>,
+        permissioned_account: &AccountInfo<'info>,
+        permission_pda: &AccountInfo<'info>,
+        members_public: bool,
+        signers_seeds: &[&[&[u8]]],
+    ) -> Result<()> {
+        require!(
+            permission_program.key() == PERMISSION_PROGRAM_ID,
+            SableError::InvalidRecipientAccounts
+        );
+
+        let mut data = UPDATE_PERMISSION_DISCRIMINATOR.to_vec();
+        let members_data = if members_public {
+            serialize_none_members()
+        } else {
+            serialize_empty_members()
+        };
+        data.extend_from_slice(&members_data);
+
+        let instruction = Instruction {
+            program_id: PERMISSION_PROGRAM_ID,
+            accounts: vec![
+                AccountMeta::new_readonly(*authority.key, true),
+                AccountMeta::new_readonly(*permissioned_account.key, true),
+                AccountMeta::new(*permission_pda.key, false),
+            ],
+            data,
+        };
+
+        let account_infos = &[
+            permission_program.clone(),
+            authority.clone(),
+            permissioned_account.clone(),
+            permission_pda.clone(),
+        ];
+
+        invoke_signed(&instruction, account_infos, signers_seeds)
+            .map_err(|_| error!(SableError::PermissionInitFailed))?;
+
+        Ok(())
+    }
+
+    pub fn close_permission<'info>(
+        permission_program: &AccountInfo<'info>,
+        payer: &AccountInfo<'info>,
+        authority: &AccountInfo<'info>,
+        permissioned_account: &AccountInfo<'info>,
+        permission_pda: &AccountInfo<'info>,
+        signers_seeds: &[&[&[u8]]],
+    ) -> Result<()> {
+        require!(
+            permission_program.key() == PERMISSION_PROGRAM_ID,
+            SableError::InvalidRecipientAccounts
+        );
+
+        let instruction = Instruction {
+            program_id: PERMISSION_PROGRAM_ID,
+            accounts: vec![
+                AccountMeta::new(*payer.key, true),
+                AccountMeta::new_readonly(*authority.key, true),
+                AccountMeta::new_readonly(*permissioned_account.key, true),
+                AccountMeta::new(*permission_pda.key, false),
+            ],
+            data: CLOSE_PERMISSION_DISCRIMINATOR.to_vec(),
+        };
+
+        let account_infos = &[
+            permission_program.clone(),
+            payer.clone(),
+            authority.clone(),
+            permissioned_account.clone(),
+            permission_pda.clone(),
+        ];
+
+        invoke_signed(&instruction, account_infos, signers_seeds)
+            .map_err(|_| error!(SableError::PermissionInitFailed))?;
+
+        Ok(())
+    }
+
+    pub fn delegate_permission<'info>(
+        permission_program: &AccountInfo<'info>,
+        payer: &AccountInfo<'info>,
+        authority: &AccountInfo<'info>,
+        permissioned_account: &AccountInfo<'info>,
+        permission_pda: &AccountInfo<'info>,
+        system_program: &AccountInfo<'info>,
+        owner_program: &AccountInfo<'info>,
+        delegation_buffer: &AccountInfo<'info>,
+        delegation_record: &AccountInfo<'info>,
+        delegation_metadata: &AccountInfo<'info>,
+        delegation_program: &AccountInfo<'info>,
+        signers_seeds: &[&[&[u8]]],
+    ) -> Result<()> {
+        require!(
+            permission_program.key() == PERMISSION_PROGRAM_ID,
+            SableError::InvalidRecipientAccounts
+        );
+
+        let accounts = vec![
+            AccountMeta::new(*payer.key, true),
+            AccountMeta::new_readonly(*authority.key, true),
+            AccountMeta::new_readonly(*permissioned_account.key, false),
+            AccountMeta::new(*permission_pda.key, false),
+            AccountMeta::new_readonly(*system_program.key, false),
+            AccountMeta::new_readonly(*owner_program.key, false),
+            AccountMeta::new(*delegation_buffer.key, false),
+            AccountMeta::new(*delegation_record.key, false),
+            AccountMeta::new(*delegation_metadata.key, false),
+            AccountMeta::new_readonly(*delegation_program.key, false),
+        ];
+
+        let instruction = Instruction {
+            program_id: PERMISSION_PROGRAM_ID,
+            accounts,
+            data: DELEGATE_PERMISSION_DISCRIMINATOR.to_vec(),
+        };
+
+        let account_infos = &[
+            permission_program.clone(),
+            payer.clone(),
+            authority.clone(),
+            permissioned_account.clone(),
+            permission_pda.clone(),
+            system_program.clone(),
+            owner_program.clone(),
+            delegation_buffer.clone(),
+            delegation_record.clone(),
+            delegation_metadata.clone(),
+            delegation_program.clone(),
+        ];
+
+        invoke_signed(&instruction, account_infos, signers_seeds)
+            .map_err(|_| error!(SableError::DelegationFailed))?;
+
+        Ok(())
+    }
+
+    pub fn commit_and_undelegate_permission<'info>(
+        permission_program: &AccountInfo<'info>,
+        authority: &AccountInfo<'info>,
+        permissioned_account: &AccountInfo<'info>,
+        permission_pda: &AccountInfo<'info>,
+        magic_program: &AccountInfo<'info>,
+        magic_context: &AccountInfo<'info>,
+        signers_seeds: &[&[&[u8]]],
+    ) -> Result<()> {
+        require!(
+            permission_program.key() == PERMISSION_PROGRAM_ID,
+            SableError::InvalidRecipientAccounts
+        );
+
+        let instruction = Instruction {
+            program_id: PERMISSION_PROGRAM_ID,
+            accounts: vec![
+                AccountMeta::new_readonly(*authority.key, true),
+                AccountMeta::new(*permissioned_account.key, false),
+                AccountMeta::new(*permission_pda.key, false),
+                AccountMeta::new_readonly(*magic_program.key, false),
+                AccountMeta::new(*magic_context.key, false),
+            ],
+            data: COMMIT_AND_UNDELEGATE_PERMISSION_DISCRIMINATOR.to_vec(),
+        };
+
+        let account_infos = &[
+            permission_program.clone(),
+            authority.clone(),
+            permissioned_account.clone(),
+            permission_pda.clone(),
+            magic_program.clone(),
+            magic_context.clone(),
+        ];
+
+        invoke_signed(&instruction, account_infos, signers_seeds)
+            .map_err(|_| error!(SableError::CommitFailed))?;
+
+        Ok(())
+    }
 }
+
+pub mod error;
+pub mod events;
+pub mod instructions;
+pub mod policy;
+pub mod state;
+
+use error::*;
+use events::*;
+use instructions::agent::*;
+use instructions::auction::*;
+use state::*;
+
+// Sable defaults to TEE validator because the project is privacy-first
+pub const ER_VALIDATOR_TEE: Pubkey =
+    pubkey!("MTEWGuqxUpYZGFJQcp8tLN7x5v9BSeoFHYWQQ3n3xzo");
+
+// Default commit frequency: 1 minute
+pub const DEFAULT_COMMIT_FREQUENCY_MS: u32 = 60_000;
 
 declare_id!("SaSAXcdWhyr1KD8TKRg6K7WPuxcPLZJHKEwsjQgL5Di");
 
@@ -199,50 +384,6 @@ pub mod sable {
         // Create PER permission for wSOL balance
         let owner_key = ctx.accounts.owner.key();
 
-        require!(
-            ctx.accounts.permission_program.key() == permission_cpi::PERMISSION_PROGRAM_ID,
-            SableError::InvalidRecipientAccounts
-        );
-        let (expected_wsol_permission, _) = Pubkey::find_program_address(
-            &[permission_cpi::PERMISSION_SEED, ctx.accounts.wsol_balance.key().as_ref()],
-            &permission_cpi::PERMISSION_PROGRAM_ID,
-        );
-        require!(
-            ctx.accounts.wsol_permission.key() == expected_wsol_permission,
-            SableError::InvalidRecipientAccounts
-        );
-
-        let mut wsol_data = vec![0u8; 8]; // discriminator
-        let wsol_flags = permission_cpi::AUTHORITY_FLAG
-            | permission_cpi::TX_LOGS_FLAG
-            | permission_cpi::TX_BALANCES_FLAG
-            | permission_cpi::TX_MESSAGE_FLAG
-            | permission_cpi::ACCOUNT_SIGNATURES_FLAG;
-        wsol_data.push(1); // Some variant
-        wsol_data.extend_from_slice(&1u32.to_le_bytes());
-        wsol_data.push(wsol_flags);
-        wsol_data.extend_from_slice(&owner_key.to_bytes());
-
-        let wsol_instruction = solana_program::instruction::Instruction {
-            program_id: permission_cpi::PERMISSION_PROGRAM_ID,
-            accounts: vec![
-                solana_program::instruction::AccountMeta::new_readonly(
-                    ctx.accounts.wsol_balance.key(),
-                    true,
-                ),
-                solana_program::instruction::AccountMeta::new(
-                    ctx.accounts.wsol_permission.key(),
-                    false,
-                ),
-                solana_program::instruction::AccountMeta::new(ctx.accounts.owner.key(), true),
-                solana_program::instruction::AccountMeta::new_readonly(
-                    ctx.accounts.system_program.key(),
-                    false,
-                ),
-            ],
-            data: wsol_data,
-        };
-
         let wsol_signer_seeds: &[&[&[u8]]] = &[&[
             USER_BALANCE_SEED.as_bytes(),
             owner_key.as_ref(),
@@ -250,20 +391,14 @@ pub mod sable {
             &[ctx.bumps.wsol_balance],
         ]];
 
-        let wsol_account_infos = &[
-            ctx.accounts.permission_program.to_account_info().clone(),
-            ctx.accounts.wsol_balance.to_account_info().clone(),
-            ctx.accounts.wsol_permission.to_account_info().clone(),
-            ctx.accounts.owner.to_account_info().clone(),
-            ctx.accounts.system_program.to_account_info().clone(),
-        ];
-
-        solana_program::program::invoke_signed(
-            &wsol_instruction,
-            wsol_account_infos,
+        permission_cpi::create_permission(
+            &ctx.accounts.permission_program.to_account_info(),
+            &ctx.accounts.wsol_balance.to_account_info(),
+            &ctx.accounts.wsol_permission.to_account_info(),
+            &ctx.accounts.owner.to_account_info(),
+            &ctx.accounts.system_program.to_account_info(),
             wsol_signer_seeds,
-        )
-        .map_err(|_| error!(SableError::PermissionInitFailed))?;
+        )?;
 
         // 3. Validate and create additional UserBalance accounts from remaining_accounts
         // Remaining accounts structure:
@@ -327,48 +462,6 @@ pub mod sable {
             // Create PER permission for this balance
             let permission_acc = &remaining[2 * n + i];
 
-            // Validate permission program
-            require!(
-                ctx.accounts.permission_program.key() == permission_cpi::PERMISSION_PROGRAM_ID,
-                SableError::InvalidRecipientAccounts
-            );
-
-            // Validate permission PDA
-            let (expected_permission, _) = Pubkey::find_program_address(
-                &[permission_cpi::PERMISSION_SEED, balance_acc.key.as_ref()],
-                &permission_cpi::PERMISSION_PROGRAM_ID,
-            );
-            require!(
-                permission_acc.key() == expected_permission,
-                SableError::InvalidRecipientAccounts
-            );
-
-            // Build instruction data manually
-            let mut data = vec![0u8; 8]; // discriminator
-            let flags = permission_cpi::AUTHORITY_FLAG
-                | permission_cpi::TX_LOGS_FLAG
-                | permission_cpi::TX_BALANCES_FLAG
-                | permission_cpi::TX_MESSAGE_FLAG
-                | permission_cpi::ACCOUNT_SIGNATURES_FLAG;
-            data.push(1); // Some variant
-            data.extend_from_slice(&1u32.to_le_bytes());
-            data.push(flags);
-            data.extend_from_slice(&owner_key.to_bytes());
-
-            let instruction = solana_program::instruction::Instruction {
-                program_id: permission_cpi::PERMISSION_PROGRAM_ID,
-                accounts: vec![
-                    solana_program::instruction::AccountMeta::new_readonly(*balance_acc.key, true),
-                    solana_program::instruction::AccountMeta::new(*permission_acc.key, false),
-                    solana_program::instruction::AccountMeta::new(*ctx.accounts.owner.key, true),
-                    solana_program::instruction::AccountMeta::new_readonly(
-                        *ctx.accounts.system_program.key,
-                        false,
-                    ),
-                ],
-                data,
-            };
-
             let balance_signer_seeds: &[&[&[u8]]] = &[&[
                 USER_BALANCE_SEED.as_bytes(),
                 owner_key.as_ref(),
@@ -376,20 +469,14 @@ pub mod sable {
                 &[bump],
             ]];
 
-            let account_infos = &[
-                ctx.accounts.permission_program.clone(),
-                balance_acc.clone(),
-                permission_acc.clone(),
-                ctx.accounts.owner.to_account_info().clone(),
-                ctx.accounts.system_program.to_account_info().clone(),
-            ];
-
-            solana_program::program::invoke_signed(
-                &instruction,
-                account_infos,
+            permission_cpi::create_permission(
+                &ctx.accounts.permission_program.to_account_info(),
+                balance_acc,
+                permission_acc,
+                &ctx.accounts.owner.to_account_info(),
+                &ctx.accounts.system_program.to_account_info(),
                 balance_signer_seeds,
-            )
-            .map_err(|_| error!(SableError::PermissionInitFailed))?;
+            )?;
         }
 
         emit!(CompleteSetupEvent {
@@ -431,13 +518,12 @@ pub mod sable {
             mint_key.as_ref(),
             &[ctx.bumps.user_balance],
         ]];
-        permission_cpi::create_permission(
-            &ctx.accounts.permission_program,
+        crate::permission_cpi::create_permission(
+            &ctx.accounts.permission_program.to_account_info(),
             &user_balance.to_account_info(),
-            &ctx.accounts.permission,
+            &ctx.accounts.permission.to_account_info(),
             &ctx.accounts.owner.to_account_info(),
             &ctx.accounts.system_program.to_account_info(),
-            owner_key,
             signer_seeds,
         )?;
 
@@ -923,10 +1009,14 @@ pub mod sable {
     /// Delegate UserState and UserBalance PDAs to the Ephemeral Rollup.
     ///
     /// Remaining accounts (per mint in mint_list, in order):
-    ///   [i*4 + 0]: user_balance PDA
-    ///   [i*4 + 1]: buffer PDA for the balance
-    ///   [i*4 + 2]: delegation_record PDA for the balance
-    ///   [i*4 + 3]: delegation_metadata PDA for the balance
+    ///   [i*8 + 0]: user_balance PDA
+    ///   [i*8 + 1]: buffer PDA for the balance
+    ///   [i*8 + 2]: delegation_record PDA for the balance
+    ///   [i*8 + 3]: delegation_metadata PDA for the balance
+    ///   [i*8 + 4]: permission PDA for the balance
+    ///   [i*8 + 5]: buffer PDA for the permission
+    ///   [i*8 + 6]: delegation_record PDA for the permission
+    ///   [i*8 + 7]: delegation_metadata PDA for the permission
     pub fn delegate_user_state_and_balances<'info>(
         ctx: Context<'_, '_, '_, 'info, DelegateUserStateAndBalances<'info>>,
         mint_list: Vec<Pubkey>,
@@ -959,8 +1049,8 @@ pub mod sable {
                 &ctx.accounts.owner,
                 user_state_seeds,
                 DelegateConfig {
-                    validator: None,
-                    ..Default::default()
+                    validator: Some(ER_VALIDATOR_TEE),
+                    commit_frequency_ms: DEFAULT_COMMIT_FREQUENCY_MS,
                 },
             )
             .map_err(|_| error!(SableError::DelegationFailed))?;
@@ -1034,6 +1124,11 @@ pub mod sable {
                 SableError::InvalidRecipientAccounts
             );
 
+            let delegate_config = DelegateConfig {
+                validator: Some(ER_VALIDATOR_TEE),
+                commit_frequency_ms: DEFAULT_COMMIT_FREQUENCY_MS,
+            };
+
             // CPI delegate the balance
             let balance_seeds = &[
                 USER_BALANCE_SEED.as_bytes(),
@@ -1050,15 +1145,8 @@ pub mod sable {
                 delegation_program: &ctx.accounts.delegation_program,
                 system_program: &ctx.accounts.system_program.to_account_info(),
             };
-            delegate_account(
-                del_accounts,
-                balance_seeds,
-                DelegateConfig {
-                    validator: None,
-                    ..Default::default()
-                },
-            )
-            .map_err(|_| error!(SableError::DelegationFailed))?;
+            delegate_account(del_accounts, balance_seeds, delegate_config)
+                .map_err(|_| error!(SableError::DelegationFailed))?;
         }
 
         emit!(DelegateEvent {
@@ -1073,7 +1161,8 @@ pub mod sable {
     /// Commit state from Ephemeral Rollup and undelegate UserState + UserBalance PDAs.
     ///
     /// Remaining accounts (per mint in mint_list, in order):
-    ///   [i]: user_balance PDA
+    ///   [i*2 + 0]: user_balance PDA
+    ///   [i*2 + 1]: permission PDA for the balance
     pub fn commit_and_undelegate_user_state_and_balances<'info>(
         ctx: Context<'_, '_, '_, 'info, CommitAndUndelegateUserStateAndBalances<'info>>,
         mint_list: Vec<Pubkey>,
@@ -1482,6 +1571,9 @@ pub struct DelegateUserStateAndBalances<'info> {
         bump = user_state.bump,
     )]
     pub user_state: Account<'info, UserState>,
+
+    /// CHECK: MagicBlock PER permission program
+    pub permission_program: AccountInfo<'info>,
 }
 
 #[commit]
@@ -1496,6 +1588,9 @@ pub struct CommitAndUndelegateUserStateAndBalances<'info> {
     /// CHECK: This account is delegated (owned by delegation program), validated in instruction
     #[account(mut)]
     pub user_state: AccountInfo<'info>,
+
+    /// CHECK: MagicBlock PER permission program
+    pub permission_program: AccountInfo<'info>,
 }
 
 // Constants

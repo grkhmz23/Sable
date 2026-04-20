@@ -13,6 +13,7 @@ import type {
   DepositParams,
   WithdrawParams,
   TransactionResult,
+  SendTransactionOpts,
 } from './types';
 
 export class TreasuryModule {
@@ -176,7 +177,10 @@ export class TreasuryModule {
   /**
    * Deposit tokens into the vault
    */
-  async deposit(params: DepositParams): Promise<TransactionResult> {
+  async deposit(
+    params: DepositParams,
+    opts?: SendTransactionOpts
+  ): Promise<TransactionResult> {
     if (!this.client.isConnected) throw new Error('Wallet not connected');
 
     const owner = this.client.walletPublicKey!;
@@ -219,13 +223,16 @@ export class TreasuryModule {
       .instruction();
 
     tx.add(depositIx);
-    return this.client.sendTransaction(tx);
+    return this.client.sendTransaction(tx, opts);
   }
 
   /**
    * Withdraw tokens from vault
    */
-  async withdraw(params: WithdrawParams): Promise<TransactionResult> {
+  async withdraw(
+    params: WithdrawParams,
+    opts?: SendTransactionOpts
+  ): Promise<TransactionResult> {
     if (!this.client.isConnected) throw new Error('Wallet not connected');
 
     const owner = this.client.walletPublicKey!;
@@ -260,7 +267,7 @@ export class TreasuryModule {
       .instruction();
 
     tx.add(withdrawIx);
-    return this.client.sendTransaction(tx);
+    return this.client.sendTransaction(tx, opts);
   }
 
   /**

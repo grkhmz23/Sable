@@ -213,12 +213,11 @@ pub fn create_task(
         &[ctx.bumps.task_escrow],
     ]];
     crate::permission_cpi::create_permission(
-        &ctx.accounts.permission_program,
+        &ctx.accounts.permission_program.to_account_info(),
         &ctx.accounts.task_escrow.to_account_info(),
-        &ctx.accounts.permission,
+        &ctx.accounts.permission.to_account_info(),
         &ctx.accounts.poster_owner.to_account_info(),
         &ctx.accounts.system_program.to_account_info(),
-        signer,
         escrow_signer_seeds,
     )?;
 

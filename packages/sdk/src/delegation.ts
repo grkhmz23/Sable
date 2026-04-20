@@ -5,6 +5,9 @@ import type {
   CommitUndelegateParams,
   DelegationStatus,
   TransactionResult,
+  RouterDelegationStatus,
+  ErRoute,
+  SendTransactionOpts,
 } from './types';
 import { DEFAULT_UPDATE_FREQUENCY_MS, DEFAULT_TTL_SECONDS, MAX_MINTS_PER_DELEGATION } from './types';
 
@@ -72,7 +75,8 @@ export class DelegationModule {
    * Commit and undelegate from ER back to L1
    */
   async commitAndUndelegate(
-    params: CommitUndelegateParams
+    params: CommitUndelegateParams,
+    opts?: SendTransactionOpts
   ): Promise<TransactionResult> {
     if (!this.client.isConnected) throw new Error('Wallet not connected');
 
@@ -106,7 +110,7 @@ export class DelegationModule {
       .remainingAccounts(remainingAccounts)
       .transaction();
 
-    return this.client.sendTransaction(tx);
+    return this.client.sendTransaction(tx, opts);
   }
 
   /**
@@ -143,6 +147,55 @@ export class DelegationModule {
     );
 
     return results;
+  }
+
+  /**
+   * Get delegation status for a single account via Magic Router.
+   * More accurate than client-side owner checking and returns validator FQDN.
+   */
+  async getDelegationStatusViaRouter(account: PublicKey): Promise<RouterDelegationStatus | null> {
+    const router = this.client.config.routerConnection;
+    if (!router) {
+      throw new Error('Magic Router connection not configured');
+    }
+    const response = await (router as any)._rpcRequest('getDelegationStatus', [
+      account.toBase58(),
+    ]);
+    if (response.error) {
+      // Account not found or not delegated
+      return null;
+    }
+    return response.result as RouterDelegationStatus;
+  }
+
+  /**
+   * Get all ER validator routes known to the Magic Router.
+   */
+  async getRoutes(): Promise<ErRoute[]> {
+    const router = this.client.config.routerConnection;
+    if (!router) {
+      throw new Error('Magic Router connection not configured');
+    }
+    const response = await (router as any)._rpcRequest('getRoutes', []);
+    if (response.error) {
+      throw new Error(`Router getRoutes failed: ${JSON.stringify(response.error)}`);
+    }
+    return response.result as ErRoute[];
+  }
+
+  /**
+   * Get the identity of the ER validator the router currently routes to.
+   */
+  async getIdentity(): Promise<PublicKey> {
+    const router = this.client.config.routerConnection;
+    if (!router) {
+      throw new Error('Magic Router connection not configured');
+    }
+    const response = await (router as any)._rpcRequest('getIdentity', []);
+    if (response.error) {
+      throw new Error(`Router getIdentity failed: ${JSON.stringify(response.error)}`);
+    }
+    return new PublicKey(response.result as string);
   }
 
   /**

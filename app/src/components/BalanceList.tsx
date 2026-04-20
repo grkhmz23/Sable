@@ -67,29 +67,24 @@ export function BalanceList() {
       }
 
       // For delegated balances, try to read via session if available
-      if (sdk.session) {
+      if (sdk.session && !sdk.session.isExpired) {
         for (const row of baseList) {
           if (row.isDelegated && row.pubkey) {
             try {
               const sessionAmount = await sdk.session.getBalance(row.pubkey);
               row.amount = sessionAmount.toString();
               row.isPrivate = false;
-            } catch (err: any) {
-              if (err.name === 'SessionExpiredError') {
-                row.isPrivate = true;
-              } else {
-                row.isPrivate = true;
-              }
+            } catch {
+              row.isPrivate = true;
             }
-          } else if (row.isDelegated && !sdk.session) {
-            row.isPrivate = true;
           }
         }
-      } else {
-        baseList.forEach((row) => {
-          if (row.isDelegated) row.isPrivate = true;
-        });
       }
+
+      // Mark any remaining delegated rows as private
+      baseList.forEach((row) => {
+        if (row.isDelegated && row.isPrivate === undefined) row.isPrivate = true;
+      });
 
       baseList.sort((a, b) => {
         if (a.isWsol && !b.isWsol) return -1;

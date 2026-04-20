@@ -11,7 +11,7 @@ import { AuctionsModule } from './auctions';
 import { SableSession, SessionExpiredError } from './session';
 import { SablePayments } from './payments';
 import { PROGRAM_ID_DEVNET } from '@sable/common';
-import type { SdkConfig, TransactionResult } from './types';
+import type { SdkConfig, TransactionResult, SendTransactionOpts } from './types';
 
 // Load the generated IDL
 import idlJson from '../idl/sable.json';
@@ -75,7 +75,11 @@ export class SableClient {
         : undefined;
 
     if (paymentsApiUrl) {
-      this.payments = new SablePayments({ apiUrl: paymentsApiUrl, apiKey: paymentsApiKey });
+      this.payments = new SablePayments({
+        apiUrl: paymentsApiUrl,
+        apiKey: paymentsApiKey,
+        routerConnection: config.routerConnection,
+      });
     } else {
       // Create a no-op instance that throws on first use so callers get a clear error
       this.payments = new Proxy({} as SablePayments, {
@@ -117,11 +121,11 @@ export class SableClient {
   }
 
   /**
-   * Close the current PER session.
+   * Close the current PER session (server-side + client-side).
    */
-  closeSession(): void {
+  async closeSession(): Promise<void> {
     if (this.session) {
-      this.session.close();
+      await this.session.close();
       this.session = null;
     }
   }
@@ -181,7 +185,9 @@ export class SableClient {
   async getUserBalance(owner: PublicKey, mint: PublicKey): Promise<any | null> {
     const [userBalance] = this.pda.deriveUserBalance(owner, mint);
 
-    if (this.session) {
+    // If we have an active PER session and the account is delegated,
+    // read the private balance through PER.
+    if (this.session && !this.session.isExpired) {
       try {
         const isDel = await this.delegation.isDelegated(userBalance);
         if (isDel) {
@@ -190,25 +196,25 @@ export class SableClient {
         }
       } catch (err: any) {
         if (err instanceof SessionExpiredError) {
-          if (this.session.perEndpoint) {
+          // Attempt one refresh using the same perEndpoint, then retry
+          if (this.config.wallet?.signMessage) {
             try {
-              this.session = await SableSession.openSession({
-                signer: {
-                  publicKey: this.config.wallet!.publicKey,
-                  signMessage: this.config.wallet!.signMessage!.bind(this.config.wallet),
-                },
-                perRpcUrl: this.session.perEndpoint,
+              await this.session.refresh({
+                publicKey: this.config.wallet.publicKey,
+                signMessage: this.config.wallet.signMessage.bind(this.config.wallet),
               });
               const amount = await this.session.getBalance(userBalance);
               return { owner, mint, amount, version: new BN(0) };
             } catch {
-              /* fall through */
+              // Refresh failed — fall through to on-chain read
             }
           }
         }
+        // Other PER errors fall through to on-chain read
       }
     }
 
+    // Fallback to on-chain read
     return this.treasury.getUserBalance(owner, mint);
   }
 
@@ -303,22 +309,70 @@ export class SableClient {
   /**
    * Send a transaction
    */
-  async sendTransaction(tx: Transaction): Promise<TransactionResult> {
+  /**
+   * Get an ER-valid blockhash for delegated accounts via Magic Router.
+   */
+  async getBlockhashForAccounts(accounts: PublicKey[]): Promise<string> {
+    const router = this.config.routerConnection;
+    if (!router) {
+      throw new Error('Magic Router connection not configured');
+    }
+    const response = await (router as any)._rpcRequest('getBlockhashForAccounts', [
+      accounts.map((a) => a.toBase58()),
+    ]);
+    if (response.error) {
+      throw new Error(`Router getBlockhashForAccounts failed: ${JSON.stringify(response.error)}`);
+    }
+    return response.result as string;
+  }
+
+  /**
+   * Send a transaction.
+   *
+   * For ER-bound transactions (operating on delegated accounts), pass
+   * `{ useRouter: true, delegatedAccounts: [...] }` to fetch an ER-valid
+   * blockhash from the Magic Router instead of the base layer.
+   */
+  async sendTransaction(
+    tx: Transaction,
+    opts?: SendTransactionOpts
+  ): Promise<TransactionResult> {
     if (!this.config.wallet) {
       throw new Error('Wallet not connected');
     }
 
-    const { blockhash, lastValidBlockHeight } = await this.config.connection.getLatestBlockhash();
+    const useRouter = opts?.useRouter && this.config.routerConnection;
+    let blockhash: string;
+    let lastValidBlockHeight: number;
+    let erBlockhash: string | undefined;
+
+    if (useRouter) {
+      if (!opts.delegatedAccounts || opts.delegatedAccounts.length === 0) {
+        throw new Error('delegatedAccounts required when useRouter=true');
+      }
+      erBlockhash = await this.getBlockhashForAccounts(opts.delegatedAccounts);
+      blockhash = erBlockhash;
+      // Router blockhashes have a short TTL; use a conservative lastValidBlockHeight
+      const slot = await this.config.routerConnection!.getSlot('confirmed');
+      lastValidBlockHeight = slot + 30;
+    } else {
+      const latest = await this.config.connection.getLatestBlockhash();
+      blockhash = latest.blockhash;
+      lastValidBlockHeight = latest.lastValidBlockHeight;
+    }
+
     tx.recentBlockhash = blockhash;
     tx.feePayer = this.config.wallet.publicKey;
 
     const signed = await this.config.wallet.signTransaction(tx);
-    const signature = await this.config.connection.sendRawTransaction(signed.serialize(), {
+    const connection = useRouter ? this.config.routerConnection! : this.config.connection;
+
+    const signature = await connection.sendRawTransaction(signed.serialize(), {
       skipPreflight: false,
       preflightCommitment: 'confirmed',
     });
 
-    const confirmation = await this.config.connection.confirmTransaction(
+    const confirmation = await connection.confirmTransaction(
       { signature, blockhash, lastValidBlockHeight },
       'confirmed'
     );
@@ -327,6 +381,6 @@ export class SableClient {
       throw new Error(`Transaction failed: ${JSON.stringify(confirmation.value.err)}`);
     }
 
-    return { signature, confirmation };
+    return { signature, confirmation, erBlockhash };
   }
 }

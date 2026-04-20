@@ -34,6 +34,8 @@ interface WalletContextValue {
   setRoutingMode: (mode: RoutingMode) => void;
   isLoading: boolean;
   refreshUserState: () => Promise<void>;
+  /** Incrementing counter that components can watch to trigger refetches */
+  refreshNonce: number;
 }
 
 const WalletContext = createContext<WalletContextValue | null>(null);
@@ -52,36 +54,36 @@ const WalletContextInner: FC<{ children: ReactNode }> = ({ children }) => {
   const wallet = useWallet();
   const [routingMode, setRoutingMode] = useState<RoutingMode>('solana');
   const [isLoading, setIsLoading] = useState(false);
+  const [refreshNonce, setRefreshNonce] = useState(0);
 
   // Determine which connection to use based on routing mode
   const connection = useMemo(() => {
     switch (routingMode) {
       case 'er':
-        if (!env.MAGICBLOCK_RPC_URL) {
-          console.warn('MagicBlock RPC URL not set, falling back to Solana RPC');
-          return baseConnection;
-        }
-        return new Connection(env.MAGICBLOCK_RPC_URL, 'confirmed');
+        // Use Magic Router for ER mode (auto-routes to the correct validator)
+        return new Connection(env.MAGIC_ROUTER_URL, 'confirmed');
       case 'solana':
       default:
         return baseConnection;
     }
   }, [routingMode, baseConnection]);
 
-  // Create SDK instance
+  // Create SDK instance with router connection for ER-mode transactions
   const sdk = useMemo(() => {
     if (!wallet.publicKey || !wallet.signTransaction) return null;
 
     return new SableSdk({
       programId: new PublicKey(env.SABLE_PROGRAM_ID),
       connection,
+      // Router connection is the same as the ER connection since we switched to router
+      routerConnection: routingMode === 'er' ? connection : undefined,
       wallet: {
         publicKey: wallet.publicKey,
         signTransaction: wallet.signTransaction,
         signAllTransactions: wallet.signAllTransactions,
       },
     });
-  }, [wallet.publicKey, wallet.signTransaction, wallet.signAllTransactions, connection]);
+  }, [wallet.publicKey, wallet.signTransaction, wallet.signAllTransactions, connection, routingMode]);
 
   // Always-available L1 SDK for delegation/commit/withdraw flows even while UI is in ER mode.
   const solanaSdk = useMemo(() => {
@@ -102,8 +104,10 @@ const WalletContextInner: FC<{ children: ReactNode }> = ({ children }) => {
     if (!sdk || !wallet.publicKey) return;
     setIsLoading(true);
     try {
-      // Trigger any refresh logic here
-      await new Promise((resolve) => setTimeout(resolve, 500));
+      // Increment nonce so all data-fetching components refetch
+      setRefreshNonce((n) => n + 1);
+      // Small delay to let fetches start
+      await new Promise((resolve) => setTimeout(resolve, 300));
     } finally {
       setIsLoading(false);
     }
@@ -118,6 +122,7 @@ const WalletContextInner: FC<{ children: ReactNode }> = ({ children }) => {
     setRoutingMode,
     isLoading,
     refreshUserState,
+    refreshNonce,
   };
 
   return (

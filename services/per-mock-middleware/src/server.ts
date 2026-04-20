@@ -105,7 +105,7 @@ const server = http.createServer(async (req, res) => {
 
   // CORS
   res.setHeader('Access-Control-Allow-Origin', '*');
-  res.setHeader('Access-Control-Allow-Methods', 'GET, POST, OPTIONS');
+  res.setHeader('Access-Control-Allow-Methods', 'GET, POST, DELETE, OPTIONS');
   res.setHeader('Access-Control-Allow-Headers', 'Content-Type');
 
   if (method === 'OPTIONS') {
@@ -193,7 +193,21 @@ const server = http.createServer(async (req, res) => {
       sessionPubkey,
       sessionSecret: Buffer.from(kp.secretKey).toString('base64'),
       expiry: Math.floor(expiry / 1000),
+      wsEndpoint: `ws://localhost:${PORT}`,
     });
+    return;
+  }
+
+  // DELETE /session
+  if (url === '/session' && method === 'DELETE') {
+    const body = await readBody(req);
+    const sessionPubkey = body.session;
+    if (!sessionPubkey) {
+      sendJson(res, 400, { error: 'Missing session' });
+      return;
+    }
+    const deleted = sessions.delete(sessionPubkey);
+    sendJson(res, deleted ? 200 : 404, { ok: deleted });
     return;
   }
 
