@@ -1,0 +1,23 @@
+{
+  "name": "@sable/x402-client",
+  "version": "1.0.0",
+  "description": "x402 client for Sable agent payments",
+  "main": "dist/index.js",
+  "types": "dist/index.d.ts",
+  "scripts": {
+    "build": "tsc",
+    "lint": "eslint src --ext .ts",
+    "typecheck": "tsc --noEmit",
+    "clean": "rm -rf dist"
+  },
+  "dependencies": {
+    "@sable/sdk": "workspace:*",
+    "@sable/common": "workspace:*",
+    "@solana/web3.js": "^1.87.0",
+    "@coral-xyz/anchor": "^0.29.0"
+  },
+  "devDependencies": {
+    "typescript": "^5.3.0",
+    "eslint": "^8.55.0"
+  }
+}

@@ -1,0 +1,30 @@
+{
+  "name": "@sable/x402-facilitator",
+  "version": "1.0.0",
+  "description": "x402 facilitator service that settles payments through Sable",
+  "main": "dist/server.js",
+  "scripts": {
+    "build": "tsc",
+    "start": "node dist/server.js",
+    "dev": "tsx src/server.ts",
+    "test": "node -r tsx/cjs ../../node_modules/.pnpm/mocha@11.7.5/node_modules/mocha/bin/mocha.js tests/**/*.test.ts"
+  },
+  "dependencies": {
+    "@sable/sdk": "workspace:*",
+    "@sable/common": "workspace:*",
+    "@solana/web3.js": "^1.87.0",
+    "@coral-xyz/anchor": "^0.29.0",
+    "express": "^4.18.2"
+  },
+  "devDependencies": {
+    "@solana/spl-token": "^0.3.9",
+    "@types/express": "^4.17.21",
+    "tsx": "^4.0.0",
+    "typescript": "^5.3.0",
+    "mocha": "^11.7.5",
+    "chai": "^6.2.2",
+    "@types/mocha": "^10.0.10",
+    "@types/chai": "^5.2.3",
+    "tweetnacl": "^1.0.3"
+  }
+}

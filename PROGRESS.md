@@ -18,7 +18,7 @@
 | 14 | SDK: auction methods | ✅ | f61cf07 | — | AuctionsModule with createTask, cancelTask, commitBid, revealBid, settleAuction, getTask, getBid, getTaskBids, listTasks. keccak256 helper in @sable/common with 3 Rust-TS parity test vectors. pnpm -r build + typecheck pass. cargo test --package sable passes.
 | 15 | SDK: PER session key flow | ✅ | f710443 | CREDS | SableSession with openSession, getBalance, getAgentBalance, close. Auto-refresh on expiry. Mock middleware service (services/per-mock-middleware/). Wired into SableClient with session-aware balance reads. Live test DEFERRED TO CREDENTIALS PASS.
 | 16 | SDK: Private Payments API adapter | ✅ | | CREDS | Mock server + SDK adapter built. Live test DEFERRED TO CREDENTIALS PASS. |
-| 17 | x402 facilitator service | ☐ | | — | |
+| 17 | x402 facilitator service | ✅ | | — | Service + client + middleware + e2e test. Skips gracefully when local validator offline. |
 | 18 | App rebrand + delete old wallet-centric UI | ☐ | | — | |
 | 19 | App: Treasury console | ☐ | | — | |
 | 20 | App: Agent dashboard | ☐ | | — | |
