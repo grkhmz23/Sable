@@ -24,7 +24,7 @@ const idl = {
 };
 
 export class SableClient {
-  program: Program;
+  program: any;
   provider: AnchorProvider;
   pda: PdaHelper;
   config: SdkConfig;
@@ -55,7 +55,7 @@ export class SableClient {
       AnchorProvider.defaultOptions()
     );
 
-    this.program = new Program(idl as any, programId, this.provider);
+    this.program = new Program(idl as any, this.provider) as any;
 
     // Initialize modules
     this.treasury = new TreasuryModule(this);

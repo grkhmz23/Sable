@@ -13,7 +13,7 @@
     "@sable/sdk": "workspace:*",
     "@sable/common": "workspace:*",
     "@solana/web3.js": "^1.87.0",
-    "@coral-xyz/anchor": "^0.29.0",
+    "@coral-xyz/anchor": "^0.32.1",
     "express": "^4.18.2"
   },
   "devDependencies": {
