@@ -4,6 +4,7 @@ export * from './transfer';
 export * from './delegation';
 export * from './agents';
 export * from './auctions';
+export * from './session';
 export * from './pda';
 export * from './types';
 export * from './sdk';

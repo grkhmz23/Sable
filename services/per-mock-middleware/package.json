@@ -1,0 +1,19 @@
+{
+  "name": "@sable/per-mock-middleware",
+  "version": "1.0.0",
+  "description": "Mock PER middleware for local development",
+  "main": "dist/server.js",
+  "scripts": {
+    "build": "tsc",
+    "start": "node dist/server.js",
+    "dev": "tsx src/server.ts"
+  },
+  "dependencies": {
+    "@solana/web3.js": "^1.87.0",
+    "tweetnacl": "^1.0.3"
+  },
+  "devDependencies": {
+    "tsx": "^4.0.0",
+    "typescript": "^5.3.0"
+  }
+}

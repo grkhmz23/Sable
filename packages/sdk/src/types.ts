@@ -22,6 +22,7 @@ export interface SdkConfig {
     publicKey: PublicKey;
     signTransaction: any;
     signAllTransactions: any;
+    signMessage?: (message: Uint8Array) => Promise<Uint8Array>;
   };
 }
 

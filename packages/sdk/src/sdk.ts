@@ -8,5 +8,6 @@ export { TransferModule } from './transfer';
 export { DelegationModule } from './delegation';
 export { AgentsModule } from './agents';
 export { AuctionsModule } from './auctions';
+export { SableSession, SessionExpiredError, UnauthorizedError } from './session';
 export { PdaHelper, PERMISSION_PROGRAM_ID } from './pda';
 export * from './types';

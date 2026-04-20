@@ -1,12 +1,14 @@
 import * as anchor from '@coral-xyz/anchor';
 import { Program, AnchorProvider } from '@coral-xyz/anchor';
 import { Connection, PublicKey, Transaction } from '@solana/web3.js';
+import { BN } from '@coral-xyz/anchor';
 import { PdaHelper, PERMISSION_PROGRAM_ID } from './pda';
 import { TreasuryModule } from './treasury';
 import { TransferModule } from './transfer';
 import { DelegationModule } from './delegation';
 import { AgentsModule } from './agents';
 import { AuctionsModule } from './auctions';
+import { SableSession, SessionExpiredError } from './session';
 import { PROGRAM_ID_DEVNET } from '@sable/common';
 import type { SdkConfig, TransactionResult } from './types';
 
@@ -34,6 +36,9 @@ export class SableClient {
   agents: import('./agents').AgentsModule;
   auctions: import('./auctions').AuctionsModule;
 
+  // PER session
+  session: SableSession | null = null;
+
   constructor(config: SdkConfig) {
     this.config = config;
     const programId = config.programId || PROGRAM_ID_DEVNET;
@@ -54,6 +59,35 @@ export class SableClient {
     this.delegation = new DelegationModule(this);
     this.agents = new AgentsModule(this);
     this.auctions = new AuctionsModule(this);
+  }
+
+  /**
+   * Open a PER session for private balance reads.
+   * Auto-refreshes an expired session once per call.
+   */
+  async openSession(perRpcUrl: string, ttlSeconds?: number): Promise<SableSession> {
+    if (!this.isConnected) throw new Error('Wallet not connected');
+    if (!this.config.wallet?.signMessage) {
+      throw new Error('Wallet does not support message signing');
+    }
+
+    const signer = {
+      publicKey: this.config.wallet.publicKey,
+      signMessage: this.config.wallet.signMessage.bind(this.config.wallet),
+    };
+
+    this.session = await SableSession.openSession({ signer, perRpcUrl, ttlSeconds });
+    return this.session;
+  }
+
+  /**
+   * Close the current PER session.
+   */
+  closeSession(): void {
+    if (this.session) {
+      this.session.close();
+      this.session = null;
+    }
   }
 
   /**
@@ -109,6 +143,36 @@ export class SableClient {
   }
 
   async getUserBalance(owner: PublicKey, mint: PublicKey): Promise<any | null> {
+    const [userBalance] = this.pda.deriveUserBalance(owner, mint);
+
+    if (this.session) {
+      try {
+        const isDel = await this.delegation.isDelegated(userBalance);
+        if (isDel) {
+          const amount = await this.session.getBalance(userBalance);
+          return { owner, mint, amount, version: new BN(0) };
+        }
+      } catch (err: any) {
+        if (err instanceof SessionExpiredError) {
+          if (this.session.perEndpoint) {
+            try {
+              this.session = await SableSession.openSession({
+                signer: {
+                  publicKey: this.config.wallet!.publicKey,
+                  signMessage: this.config.wallet!.signMessage!.bind(this.config.wallet),
+                },
+                perRpcUrl: this.session.perEndpoint,
+              });
+              const amount = await this.session.getBalance(userBalance);
+              return { owner, mint, amount, version: new BN(0) };
+            } catch {
+              /* fall through */
+            }
+          }
+        }
+      }
+    }
+
     return this.treasury.getUserBalance(owner, mint);
   }
 
