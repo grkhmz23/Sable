@@ -16,6 +16,9 @@ const DEFAULT_DELEGATION_PROGRAM = new PublicKey(
   'DELeGGvXpWV2fqJUhqcF5ZSYMS4JTLjteaAMARRSaeSh'
 );
 
+const MAGIC_PROGRAM = new PublicKey('Magic11111111111111111111111111111111111111');
+const MAGIC_CONTEXT = new PublicKey('MagicContext1111111111111111111111111111111');
+
 export class DelegationModule {
   constructor(private client: SableClient) {}
 
@@ -33,21 +36,35 @@ export class DelegationModule {
     const owner = this.client.walletPublicKey!;
     const [userState] = this.client.pda.deriveUserState(owner);
 
+    // Derive user_state delegation PDAs (added by #[delegate] macro)
+    const [bufferUserState] = PublicKey.findProgramAddressSync(
+      [Buffer.from('buffer'), userState.toBuffer()],
+      this.client.program.programId
+    );
+    const [delegationRecordUserState] = PublicKey.findProgramAddressSync(
+      [Buffer.from('delegation'), userState.toBuffer()],
+      DEFAULT_DELEGATION_PROGRAM
+    );
+    const [delegationMetadataUserState] = PublicKey.findProgramAddressSync(
+      [Buffer.from('delegation-metadata'), userState.toBuffer()],
+      DEFAULT_DELEGATION_PROGRAM
+    );
+
     // Build remaining accounts for delegation (4 per mint: balance, buffer, record, metadata)
     const remainingAccounts: any[] = [];
     for (const mint of mintList) {
       const [balancePda] = this.client.pda.deriveUserBalance(owner, mint);
       const [bufferPda] = PublicKey.findProgramAddressSync(
-        [Buffer.from('delegate_buffer'), balancePda.toBuffer()],
+        [Buffer.from('buffer'), balancePda.toBuffer()],
         this.client.program.programId
       );
       const [recordPda] = PublicKey.findProgramAddressSync(
-        [Buffer.from('delegation_record'), balancePda.toBuffer()],
-        new PublicKey('DELeGGvXpWV2fqJUhqcF5ZSYMS4JTLjteaAMARRSaeSh')
+        [Buffer.from('delegation'), balancePda.toBuffer()],
+        DEFAULT_DELEGATION_PROGRAM
       );
       const [metadataPda] = PublicKey.findProgramAddressSync(
-        [Buffer.from('delegation_metadata'), balancePda.toBuffer()],
-        new PublicKey('DELeGGvXpWV2fqJUhqcF5ZSYMS4JTLjteaAMARRSaeSh')
+        [Buffer.from('delegation-metadata'), balancePda.toBuffer()],
+        DEFAULT_DELEGATION_PROGRAM
       );
 
       remainingAccounts.push(
@@ -62,7 +79,12 @@ export class DelegationModule {
       .delegateUserStateAndBalances(mintList)
       .accounts({
         owner,
+        bufferUserState,
+        delegationRecordUserState,
+        delegationMetadataUserState,
         userState,
+        ownerProgram: this.client.program.programId,
+        delegationProgram: DEFAULT_DELEGATION_PROGRAM,
         systemProgram: SystemProgram.programId,
       })
       .remainingAccounts(remainingAccounts)
@@ -105,6 +127,8 @@ export class DelegationModule {
         payer: owner,
         owner,
         userState,
+        magicProgram: MAGIC_PROGRAM,
+        magicContext: MAGIC_CONTEXT,
         systemProgram: SystemProgram.programId,
       })
       .remainingAccounts(remainingAccounts)
