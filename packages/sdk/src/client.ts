@@ -5,6 +5,7 @@ import { PdaHelper, PERMISSION_PROGRAM_ID } from './pda';
 import { TreasuryModule } from './treasury';
 import { TransferModule } from './transfer';
 import { DelegationModule } from './delegation';
+import { AgentsModule } from './agents';
 import { PROGRAM_ID_DEVNET } from '@sable/common';
 import type { SdkConfig, TransactionResult } from './types';
 
@@ -29,6 +30,7 @@ export class SableClient {
   treasury: import('./treasury').TreasuryModule;
   transfer: import('./transfer').TransferModule;
   delegation: import('./delegation').DelegationModule;
+  agents: import('./agents').AgentsModule;
 
   constructor(config: SdkConfig) {
     this.config = config;
@@ -48,6 +50,7 @@ export class SableClient {
     this.treasury = new TreasuryModule(this);
     this.transfer = new TransferModule(this);
     this.delegation = new DelegationModule(this);
+    this.agents = new AgentsModule(this);
   }
 
   /**

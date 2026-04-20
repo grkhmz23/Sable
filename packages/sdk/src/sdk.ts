@@ -6,5 +6,6 @@ export { SableClient, SableClient as SableSdk } from './client';
 export { TreasuryModule } from './treasury';
 export { TransferModule } from './transfer';
 export { DelegationModule } from './delegation';
+export { AgentsModule } from './agents';
 export { PdaHelper, PERMISSION_PROGRAM_ID } from './pda';
 export * from './types';
