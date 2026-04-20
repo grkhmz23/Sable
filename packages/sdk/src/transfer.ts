@@ -15,6 +15,7 @@ import type {
   SendTransactionOpts,
 } from './types';
 import { MAX_BATCH_TRANSFER_RECIPIENTS } from './types';
+import { toRecipientKindEnum } from '@sable/common';
 
 export class TransferModule {
   constructor(private client: SableClient) {}
@@ -54,6 +55,7 @@ export class TransferModule {
         items.map((item) => ({
           toOwner: item.toOwner,
           amount: new BN(item.amount.toString()),
+          kind: toRecipientKindEnum(item.kind),
         }))
       )
       .accounts({
@@ -166,6 +168,7 @@ export class TransferModule {
         items.map((item) => ({
           toOwner: item.toOwner,
           amount: new BN(item.amount.toString()),
+          kind: toRecipientKindEnum(item.kind),
         }))
       )
       .accounts({
@@ -229,12 +232,14 @@ export class TransferModule {
         items.push({
           toOwner: new PublicKey(parts[0]),
           amount: new BN(parts[1]),
+          kind: 'user',
         });
       } else if (parts.length === 1 && defaultAmount) {
         // Format: address (use default amount)
         items.push({
           toOwner: new PublicKey(parts[0]),
           amount: new BN(defaultAmount),
+          kind: 'user',
         });
       }
     }

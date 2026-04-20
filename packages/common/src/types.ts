@@ -37,9 +37,16 @@ export interface DepositParams {
   amount: BN;
 }
 
+export type RecipientKind = 'user' | 'agent';
+
+export function toRecipientKindEnum(kind: RecipientKind): { user: {} } | { agent: {} } {
+  return kind === 'user' ? { user: {} } : { agent: {} };
+}
+
 export interface TransferItem {
   toOwner: PublicKey;
   amount: BN;
+  kind: RecipientKind;
 }
 
 export interface TransferBatchParams {

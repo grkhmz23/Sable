@@ -1,6 +1,7 @@
 import { PublicKey } from '@solana/web3.js';
 import { BN } from '@coral-xyz/anchor';
 import { Connection, TransactionSignature } from '@solana/web3.js';
+import type { RecipientKind } from '@sable/common';
 
 // wSOL mint address - always included by default
 export const WSOL_MINT = new PublicKey('So11111111111111111111111111111111111111112');
@@ -8,6 +9,7 @@ export const WSOL_MINT = new PublicKey('So11111111111111111111111111111111111111
 export interface TransferItem {
   toOwner: PublicKey;
   amount: BN;
+  kind: RecipientKind;
 }
 
 export interface BatchTransferInput {

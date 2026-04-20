@@ -1,5 +1,6 @@
 import { expect } from 'chai';
 import { BN } from '@coral-xyz/anchor';
+import { Keypair } from '@solana/web3.js';
 import { getAssociatedTokenAddressSync } from '@solana/spl-token';
 import { setupUser, sleep, ensureSdk, getWallet, getMint, getPda } from './helpers/setup';
 import { checkConservation } from './helpers/conservation';
@@ -8,9 +9,12 @@ describe('01-treasury', () => {
   let sdk: Awaited<ReturnType<typeof setupUser>>['sdk'];
   let wallet: Awaited<ReturnType<typeof setupUser>>['wallet'];
   let mint: Awaited<ReturnType<typeof setupUser>>['mint'];
+  let recipientSdk: Awaited<ReturnType<typeof setupUser>>['sdk'];
+  let recipientWallet: Awaited<ReturnType<typeof setupUser>>['wallet'];
 
   before(async () => {
     ({ sdk, wallet, mint } = await setupUser());
+    ({ sdk: recipientSdk, wallet: recipientWallet } = await setupUser(Keypair.generate()));
   });
 
   afterEach(async () => {
@@ -41,16 +45,15 @@ describe('01-treasury', () => {
   });
 
   it('can transfer batch', async () => {
-    const recipient = wallet.publicKey; // self-transfer for test
+    const recipient = recipientWallet.publicKey;
     const amount = new BN(10_000);
 
     const before = await sdk.getUserBalance(wallet.publicKey, mint);
-    await sdk.transferBatchChunked(mint, [{ toOwner: recipient, amount }], 15);
+    await sdk.transferBatchChunked(mint, [{ toOwner: recipient, amount, kind: 'user' }], 15);
     await sleep(500);
 
     const after = await sdk.getUserBalance(wallet.publicKey, mint);
-    // Self transfer: amount should be unchanged
-    expect(after.amount.toNumber()).to.equal(before.amount.toNumber());
+    expect(before.amount.sub(after.amount).toNumber()).to.equal(amount.toNumber());
   });
 
   it('can withdraw tokens', async () => {

@@ -262,6 +262,7 @@ function SendForm() {
         items = addresses.map((addr) => ({
           toOwner: new PublicKey(addr),
           amount: new BN(parseFloat(defaultAmount) * 1e9),
+          kind: 'user' as const,
         }));
       } else {
         items = sdk.parseBatchTransferInput(recipients, defaultAmount);

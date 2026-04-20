@@ -53,10 +53,10 @@ export async function ensureSdk(): Promise<SableClient> {
   const connection = getConnection();
   const wallet = getWallet();
 
-  // Airdrop if needed
+  // Airdrop if needed (only if nearly empty — devnet faucet is rate-limited)
   const balance = await connection.getBalance(wallet.publicKey);
-  if (balance < 2 * LAMPORTS_PER_SOL) {
-    await connection.requestAirdrop(wallet.publicKey, 2 * LAMPORTS_PER_SOL);
+  if (balance < 0.01 * LAMPORTS_PER_SOL) {
+    await connection.requestAirdrop(wallet.publicKey, LAMPORTS_PER_SOL);
     await sleep(500);
   }
 
