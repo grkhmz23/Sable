@@ -22,7 +22,7 @@
 | 18 | App rebrand + delete old wallet-centric UI | ✅ | 53b5125 | — | Rebranded landing page, created /app treasury dashboard with sidebar nav, skeleton pages for /app/agents, /app/tasks, /app/x402, /app/settings. ActionPanel tabs replaced with Treasury/Agents/Tasks/Activity. No remaining L2 references in UI. `pnpm app:dev` runs, all routes render without errors. |
 | 19 | App: Treasury console | ✅ | | — | TreasuryView with FundModal (AML + buildDeposit), session-gated BalanceList, ActivityFeed with 10s polling, delegation/auto-session flows. `pnpm app:dev` builds clean. Devnet + live payments verification DEFERRED TO CREDENTIALS PASS. |
 | 20 | App: Agent dashboard | ✅ | | — | AgentsView with tree hierarchy, detail pane (balances, policy, actions), spawn modal with keypair generation/download, policy editor with live preview, fund/defund modals. `pnpm -r build` + `pnpm typecheck` pass. |
-| 21 | App: Auction marketplace | ☐ | | — | |
+| 21 | App: Auction marketplace | ✅ | | — | TasksView with Open/My Tasks/My Bids tabs, create task modal, task detail with countdown timer, commit bid with nonce download, reveal bid with file upload, settle action, privacy proof panel. `pnpm -r build` + `pnpm typecheck` pass. |
 | 22 | App: x402 live demo | ☐ | | — | |
 | 23 | Full integration test suite | ☐ | | — | |
 | 24 | Devnet deployment + MagicBlock testing endpoint | ☐ | | — | THE CREDENTIALS PASS — flips all mocks to live |
